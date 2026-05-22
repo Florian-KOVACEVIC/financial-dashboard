@@ -3709,29 +3709,90 @@ with onglet7:
                         st.rerun()
                 st.divider()
     else:
-        # Catégories de recherche rapide
-        st.markdown("**Recherches populaires**")
-        _cats = {
-            "Tech US": ["AAPL", "MSFT", "GOOGL", "NVDA", "META", "AMZN", "TSLA", "NFLX", "CRM", "AMD"],
-            "Finance": ["JPM", "GS", "BLK", "MS", "BAC", "V", "MA", "AXP", "SCHW", "BX"],
-            "Europe": ["MC.PA", "SAP.DE", "ASML.AS", "SAN.PA", "OR.PA", "TTE.PA", "SIE.DE", "ABI.BR", "NOVO-B.CO", "SHEL.AS"],
-            "Crypto": ["BTC-USD", "ETH-USD", "SOL-USD", "BNB-USD", "XRP-USD", "ADA-USD", "AVAX-USD", "DOGE-USD", "DOT-USD", "LINK-USD"],
-            "Indices": ["^GSPC", "^IXIC", "^DJI", "^FCHI", "^GDAXI", "^N225", "^HSI", "^KS11", "^STOXX50E", "^FTSE"],
-            "Matières premières": ["GC=F", "SI=F", "CL=F", "NG=F", "HG=F", "PL=F", "ZW=F", "ZC=F", "KC=F", "CT=F"],
-        }
-        for cat_name, cat_tickers in _cats.items():
-            st.caption(f"**{cat_name}**")
-            cols = st.columns(10)
-            for idx, tk in enumerate(cat_tickers):
-                already = tk in st.session_state.custom_tickers or tk in selection
-                with cols[idx]:
-                    if already:
-                        st.button(f"{tk} ✓", key=f"qk_{tk}", disabled=True)
-                    else:
-                        if st.button(tk, key=f"qk_{tk}"):
-                            st.session_state.custom_tickers.append(tk)
-                            sauvegarder_tickers_json(st.session_state.custom_tickers)
-                            st.rerun()
+        # Catégories de recherche rapide — tableau structuré
+        _cats = [
+            ("Tech US", [
+                ("Apple","AAPL"),("Microsoft","MSFT"),("Alphabet","GOOGL"),("Nvidia","NVDA"),("Meta","META"),
+                ("Amazon","AMZN"),("Tesla","TSLA"),("Netflix","NFLX"),("Salesforce","CRM"),("AMD","AMD"),
+            ]),
+            ("Finance", [
+                ("JPMorgan","JPM"),("Goldman Sachs","GS"),("BlackRock","BLK"),("Morgan Stanley","MS"),
+                ("Bank of America","BAC"),("Visa","V"),("Mastercard","MA"),("Am. Express","AXP"),("Schwab","SCHW"),("Blackstone","BX"),
+            ]),
+            ("Europe", [
+                ("LVMH","MC.PA"),("SAP","SAP.DE"),("ASML","ASML.AS"),("Sanofi","SAN.PA"),("L'Oréal","OR.PA"),
+                ("TotalEnergies","TTE.PA"),("Siemens","SIE.DE"),("AB InBev","ABI.BR"),("Novo Nordisk","NOVO-B.CO"),("Shell","SHEL.AS"),
+            ]),
+            ("Crypto", [
+                ("Bitcoin","BTC-USD"),("Ethereum","ETH-USD"),("Solana","SOL-USD"),("BNB","BNB-USD"),("XRP","XRP-USD"),
+                ("Cardano","ADA-USD"),("Avalanche","AVAX-USD"),("Dogecoin","DOGE-USD"),("Polkadot","DOT-USD"),("Chainlink","LINK-USD"),
+            ]),
+            ("Indices", [
+                ("S&P 500","^GSPC"),("Nasdaq","^IXIC"),("Dow Jones","^DJI"),("CAC 40","^FCHI"),("DAX 40","^GDAXI"),
+                ("Nikkei 225","^N225"),("Hang Seng","^HSI"),("KOSPI","^KS11"),("Euro Stoxx 50","^STOXX50E"),("FTSE 100","^FTSE"),
+            ]),
+            ("Matières premières", [
+                ("Or","GC=F"),("Argent","SI=F"),("Pétrole WTI","CL=F"),("Gaz naturel","NG=F"),("Cuivre","HG=F"),
+                ("Platine","PL=F"),("Blé","ZW=F"),("Maïs","ZC=F"),("Café","KC=F"),("Coton","CT=F"),
+            ]),
+        ]
+
+        # CSS pour le tableau
+        st.markdown("""
+        <style>
+        .rp-table{width:100%;border-collapse:separate;border-spacing:0;border-radius:10px;overflow:hidden;
+                   border:1px solid rgba(255,255,255,0.08);margin-bottom:8px;}
+        .rp-table td{padding:0;text-align:center;font-size:.75rem;}
+        .rp-cat{background:rgba(255,255,255,0.04);padding:12px 16px!important;text-align:left!important;
+                font-weight:600;font-size:.78rem;color:rgba(255,255,255,0.85);vertical-align:middle;
+                border-right:1px solid rgba(255,255,255,0.06);width:130px;min-width:130px;}
+        .rp-name{background:rgba(255,255,255,0.02);padding:6px 4px!important;
+                 color:rgba(255,255,255,0.45);font-size:.68rem;font-weight:400;
+                 border-bottom:none;letter-spacing:.2px;}
+        .rp-tick{background:transparent;padding:4px 4px 8px!important;}
+        .rp-tick a{color:#5b9ef5;font-family:'DM Mono',monospace;font-size:.73rem;font-weight:500;
+                   text-decoration:none;cursor:pointer;padding:3px 8px;border-radius:5px;
+                   border:1px solid rgba(91,158,245,0.15);transition:all .15s;display:inline-block;}
+        .rp-tick a:hover{background:rgba(91,158,245,0.1);border-color:rgba(91,158,245,0.35);color:#93bbfc;}
+        .rp-tick .added{color:rgba(255,255,255,0.25);font-family:'DM Mono',monospace;font-size:.73rem;
+                        font-weight:400;padding:3px 8px;border-radius:5px;
+                        border:1px solid rgba(255,255,255,0.05);display:inline-block;}
+        </style>
+        """, unsafe_allow_html=True)
+
+        # Collecter les tickers déjà ajoutés pour le rendu HTML
+        _added = set(st.session_state.custom_tickers) | set(selection)
+
+        for cat_name, items in _cats:
+            names_cells = ""
+            ticks_cells = ""
+            for name, tk in items:
+                names_cells += f'<td class="rp-name">{name}</td>'
+                if tk in _added:
+                    ticks_cells += f'<td class="rp-tick"><span class="added">{tk} ✓</span></td>'
+                else:
+                    ticks_cells += f'<td class="rp-tick"><a id="rp_{tk}">{tk}</a></td>'
+
+            st.markdown(f"""
+            <table class="rp-table">
+              <tr><td class="rp-cat" rowspan="2">{cat_name}</td>{names_cells}</tr>
+              <tr>{ticks_cells}</tr>
+            </table>""", unsafe_allow_html=True)
+
+        # Ajout rapide par sélection
+        all_items = [(f"{name}  ({tk})", tk) for _, items in _cats for name, tk in items if tk not in _added]
+        if all_items:
+            st.divider()
+            c1, c2 = st.columns([4, 1])
+            labels = [x[0] for x in all_items]
+            chosen = c1.selectbox("Ajout rapide", labels, index=None,
+                                  placeholder="Sélectionner un actif à ajouter...",
+                                  label_visibility="collapsed")
+            if chosen and c2.button("Ajouter", key="qk_add_btn"):
+                tk = dict(all_items)[chosen]
+                st.session_state.custom_tickers.append(tk)
+                sauvegarder_tickers_json(st.session_state.custom_tickers)
+                st.rerun()
 
 
 # python -m streamlit run app.py
