@@ -3712,25 +3712,26 @@ with onglet7:
         # Catégories de recherche rapide
         st.markdown("**Recherches populaires**")
         _cats = {
-            "Tech US": ["AAPL", "MSFT", "GOOGL", "NVDA", "META", "AMZN", "TSLA"],
-            "Finance": ["JPM", "GS", "BLK", "MS", "BAC", "V", "MA"],
-            "Europe": ["MC.PA", "SAP.DE", "ASML.AS", "SAN.PA", "OR.PA", "TTE.PA"],
-            "Crypto": ["BTC-USD", "ETH-USD", "SOL-USD", "BNB-USD", "XRP-USD"],
-            "Indices": ["^GSPC", "^IXIC", "^DJI", "^FCHI", "^GDAXI", "^N225"],
-            "Matières premières": ["GC=F", "SI=F", "CL=F", "NG=F"],
+            "Tech US": ["AAPL", "MSFT", "GOOGL", "NVDA", "META", "AMZN", "TSLA", "NFLX", "CRM", "AMD"],
+            "Finance": ["JPM", "GS", "BLK", "MS", "BAC", "V", "MA", "AXP", "SCHW", "BX"],
+            "Europe": ["MC.PA", "SAP.DE", "ASML.AS", "SAN.PA", "OR.PA", "TTE.PA", "SIE.DE", "ABI.BR", "NOVO-B.CO", "SHEL.AS"],
+            "Crypto": ["BTC-USD", "ETH-USD", "SOL-USD", "BNB-USD", "XRP-USD", "ADA-USD", "AVAX-USD", "DOGE-USD", "DOT-USD", "LINK-USD"],
+            "Indices": ["^GSPC", "^IXIC", "^DJI", "^FCHI", "^GDAXI", "^N225", "^HSI", "^KS11", "^STOXX50E", "^FTSE"],
+            "Matières premières": ["GC=F", "SI=F", "CL=F", "NG=F", "HG=F", "PL=F", "ZW=F", "ZC=F", "KC=F", "CT=F"],
         }
         for cat_name, cat_tickers in _cats.items():
             st.caption(f"**{cat_name}**")
-            cols = st.columns(len(cat_tickers))
-            for col, tk in zip(cols, cat_tickers):
+            cols = st.columns(10)
+            for idx, tk in enumerate(cat_tickers):
                 already = tk in st.session_state.custom_tickers or tk in selection
-                if already:
-                    col.button(f"{tk} ✓", key=f"qk_{tk}", disabled=True)
-                else:
-                    if col.button(tk, key=f"qk_{tk}"):
-                        st.session_state.custom_tickers.append(tk)
-                        sauvegarder_tickers_json(st.session_state.custom_tickers)
-                        st.rerun()
+                with cols[idx]:
+                    if already:
+                        st.button(f"{tk} ✓", key=f"qk_{tk}", disabled=True)
+                    else:
+                        if st.button(tk, key=f"qk_{tk}"):
+                            st.session_state.custom_tickers.append(tk)
+                            sauvegarder_tickers_json(st.session_state.custom_tickers)
+                            st.rerun()
 
 
 # python -m streamlit run app.py
