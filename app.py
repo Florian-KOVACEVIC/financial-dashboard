@@ -3740,9 +3740,9 @@ with onglet7:
         # CSS pour le tableau
         st.markdown("""
         <style>
-        .rp-table{width:100%;border-collapse:separate;border-spacing:0;border-radius:10px;overflow:hidden;
+        .rp-table{width:100%;table-layout:fixed;border-collapse:separate;border-spacing:0;border-radius:10px;overflow:hidden;
                    border:1px solid rgba(255,255,255,0.08);margin-bottom:8px;}
-        .rp-table td{padding:0;text-align:center;font-size:.75rem;}
+        .rp-table td{padding:0;text-align:center;font-size:.75rem;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
         .rp-cat{background:rgba(255,255,255,0.04);padding:12px 16px!important;text-align:left!important;
                 font-weight:600;font-size:.78rem;color:rgba(255,255,255,0.85);vertical-align:middle;
                 border-right:1px solid rgba(255,255,255,0.06);width:130px;min-width:130px;}
