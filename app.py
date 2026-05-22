@@ -806,7 +806,12 @@ with st.sidebar:
         _all_predefined.update(liste)
         st.subheader(cat)
         for t in liste:
-            if st.checkbox(t, value=t in DEFAUT or t in st.session_state.activated_tickers):
+            # Activer la checkbox si demandé depuis le glossaire
+            cb_key = f"cb_{t}"
+            if t in st.session_state.activated_tickers:
+                st.session_state[cb_key] = True
+                st.session_state.activated_tickers.discard(t)
+            if st.checkbox(t, value=t in DEFAUT, key=cb_key):
                 selection.append(t)
 
     st.divider()
@@ -3745,12 +3750,10 @@ with onglet7:
         # CSS pour la grille
         st.markdown("""
         <style>
-        .rp-nm{font-size:.66rem;color:rgba(255,255,255,0.4);text-align:center;
+        .rp-nm{font-size:.66rem;color:#7cb3f0;text-align:center;
                padding:2px 0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
-        .rp-cat-label{font-weight:600;font-size:.78rem;color:rgba(255,255,255,0.85);
-                      padding:14px 0 6px;border-bottom:1px solid rgba(255,255,255,0.06);margin-bottom:6px;}
-        .rp-added{font-family:'DM Mono',monospace;font-size:.70rem;color:rgba(255,255,255,0.25);
-                  text-align:center;padding:4px 0;}
+        .rp-cat-label{font-weight:700;font-size:.95rem;color:rgba(255,255,255,0.9);
+                      padding:18px 0 8px;border-bottom:1px solid rgba(255,255,255,0.08);margin-bottom:8px;}
         </style>
         """, unsafe_allow_html=True)
 
@@ -3764,7 +3767,16 @@ with onglet7:
                 with col:
                     st.markdown(f'<div class="rp-nm">{name}</div>', unsafe_allow_html=True)
                     if tk in _added:
-                        st.markdown(f'<div class="rp-added">{tk} ✓</div>', unsafe_allow_html=True)
+                        if st.button(f"{tk} ✓", key=f"qk_{tk}", use_container_width=True):
+                            # Désélectionner : décocher la checkbox ou retirer des custom
+                            if tk in _all_predefined:
+                                cb_key = f"cb_{tk}"
+                                st.session_state[cb_key] = False
+                            else:
+                                if tk in st.session_state.custom_tickers:
+                                    st.session_state.custom_tickers.remove(tk)
+                                    sauvegarder_tickers_json(st.session_state.custom_tickers)
+                            st.rerun()
                     else:
                         if st.button(tk, key=f"qk_{tk}", use_container_width=True):
                             if tk in _all_predefined:
