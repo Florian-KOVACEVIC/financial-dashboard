@@ -197,7 +197,8 @@ def get_volume(tickers: tuple, debut: str, fin: str) -> pd.DataFrame:
                           auto_adjust=True, progress=False, group_by="ticker", threads=True)
         return (raw.xs("Volume", axis=1, level=1) if isinstance(raw.columns, pd.MultiIndex)
                 else raw[["Volume"]].rename(columns={"Volume": tickers[0]})).dropna(how="all")
-    except: return pd.DataFrame()
+    except Exception:
+        return pd.DataFrame()
 
 @st.cache_data(ttl=3600, show_spinner=False)
 def get_fiche(ticker: str) -> dict:
@@ -228,7 +229,7 @@ def get_fiche(ticker: str) -> dict:
         ex_div_dt    = None
         if ex_div_raw:
             try: ex_div_dt = datetime.utcfromtimestamp(ex_div_raw).date()
-            except: pass
+            except Exception: pass
 
         # Prochaine publication de résultats
         earnings_dt  = None
@@ -241,7 +242,7 @@ def get_fiche(ticker: str) -> dict:
             elif isinstance(cal, pd.DataFrame) and not cal.empty:
                 if "Earnings Date" in cal.index:
                     earnings_dt = pd.to_datetime(cal.loc["Earnings Date"].iloc[0]).date()
-        except: pass
+        except Exception: pass
 
         return {
             "Nom":              info.get("longName") or info.get("shortName", ticker),
@@ -287,7 +288,7 @@ def get_fiche(ticker: str) -> dict:
             "Marge_nette":      info.get("profitMargins"),
             "Quick_ratio":      info.get("quickRatio"),
         }
-    except: return {}
+    except Exception: return {}
 
 @st.cache_data(ttl=600, show_spinner=False)
 def get_news(ticker: str) -> list:
@@ -315,10 +316,10 @@ def get_news(ticker: str) -> list:
             pub_dt = None
             if isinstance(pub_raw, str) and pub_raw:
                 try: pub_dt = datetime.fromisoformat(pub_raw.replace("Z", "+00:00"))
-                except: pass
+                except Exception: pass
             elif isinstance(pub_raw, (int, float)) and pub_raw:
                 try: pub_dt = datetime.utcfromtimestamp(pub_raw)
-                except: pass
+                except Exception: pass
             if title:
                 result.append({"title": title, "summary": summary, "url": url,
                                 "source": source, "thumb": thumb, "date": pub_dt})
@@ -329,7 +330,7 @@ def get_news(ticker: str) -> list:
 @st.cache_data(ttl=3600, show_spinner=False)
 def verifier_ticker(ticker: str) -> bool:
     try: return not yf.download(ticker, period="5d", progress=False).empty
-    except: return False
+    except Exception: return False
 
 @st.cache_data(ttl=600, show_spinner=False)
 def rechercher_tickers(query: str) -> list:
@@ -338,7 +339,7 @@ def rechercher_tickers(query: str) -> list:
         return [{"symbol": q.get("symbol",""), "name": q.get("longname") or q.get("shortname",""),
                  "exchange": q.get("exchange",""), "type": q.get("quoteType","")}
                 for q in (quotes or []) if q.get("symbol")]
-    except: return []
+    except Exception: return []
 
 @st.cache_data(ttl=900, show_spinner=False)
 def get_macro_quote(ticker: str) -> dict:
@@ -1559,7 +1560,7 @@ with onglet_pf:
                                 v = float(str(val).replace("%","").replace("+",""))
                                 if v > 0:  return "color: #00D4AA"
                                 if v < 0:  return "color: #FF6B6B"
-                            except: pass
+                            except Exception: pass
                             return ""
 
                         st.dataframe(
@@ -3524,7 +3525,7 @@ with onglet_heat:
                         v = float(str(val).replace("%","").replace("+",""))
                         if v > 0:  return "color: #27AE60; font-weight:600"
                         if v < 0:  return "color: #C0392B; font-weight:600"
-                    except: pass
+                    except Exception: pass
                     return ""
 
                 st.dataframe(
