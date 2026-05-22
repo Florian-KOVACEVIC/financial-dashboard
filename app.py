@@ -3742,19 +3742,15 @@ with onglet7:
             ]),
         ]
 
-        # CSS pour le tableau
+        # CSS pour la grille
         st.markdown("""
         <style>
-        .rp-table{width:100%;table-layout:fixed;border-collapse:collapse;border-radius:10px;overflow:hidden;
-                   border:1px solid rgba(255,255,255,0.08);margin-bottom:12px;}
-        .rp-table td{padding:0;text-align:center;font-size:.75rem;overflow:hidden;text-overflow:ellipsis;
-                     white-space:nowrap;border:1px solid rgba(255,255,255,0.06);}
-        .rp-cat{background:rgba(255,255,255,0.04);padding:12px 16px!important;text-align:left!important;
-                font-weight:600;font-size:.78rem;color:rgba(255,255,255,0.85);vertical-align:middle;
-                width:130px;min-width:130px;}
-        .rp-name{background:rgba(255,255,255,0.025);padding:7px 4px!important;
-                 color:rgba(255,255,255,0.45);font-size:.68rem;font-weight:400;letter-spacing:.2px;}
-        .rp-tick{background:rgba(0,0,0,0.15);padding:7px 4px!important;}
+        .rp-nm{font-size:.66rem;color:rgba(255,255,255,0.4);text-align:center;
+               padding:2px 0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+        .rp-cat-label{font-weight:600;font-size:.78rem;color:rgba(255,255,255,0.85);
+                      padding:14px 0 6px;border-bottom:1px solid rgba(255,255,255,0.06);margin-bottom:6px;}
+        .rp-added{font-family:'DM Mono',monospace;font-size:.70rem;color:rgba(255,255,255,0.25);
+                  text-align:center;padding:4px 0;}
         </style>
         """, unsafe_allow_html=True)
 
@@ -3762,40 +3758,21 @@ with onglet7:
         _added = set(st.session_state.custom_tickers) | set(selection)
 
         for cat_name, items in _cats:
-            names_cells = ""
-            ticks_cells = ""
-            for name, tk in items:
-                names_cells += f'<td class="rp-name">{name}</td>'
-                if tk in _added:
-                    ticks_cells += f'<td class="rp-tick"><span style="color:rgba(255,255,255,0.25);font-family:\'DM Mono\',monospace;font-size:.72rem">{tk} ✓</span></td>'
-                else:
-                    ticks_cells += f'<td class="rp-tick"><span style="color:#5b9ef5;font-family:\'DM Mono\',monospace;font-size:.72rem;font-weight:500">{tk}</span></td>'
-
-            st.markdown(f"""
-            <table class="rp-table">
-              <tr><td class="rp-cat" rowspan="2">{cat_name}</td>{names_cells}</tr>
-              <tr>{ticks_cells}</tr>
-            </table>""", unsafe_allow_html=True)
-
-        # Boutons cliquables par catégorie
-        for cat_name, items in _cats:
-            tickers_dispo = [(name, tk) for name, tk in items if tk not in _added]
-            if tickers_dispo:
-                cols = st.columns(len(items))
-                idx = 0
-                for name, tk in items:
+            st.markdown(f'<div class="rp-cat-label">{cat_name}</div>', unsafe_allow_html=True)
+            cols = st.columns(len(items))
+            for col, (name, tk) in zip(cols, items):
+                with col:
+                    st.markdown(f'<div class="rp-nm">{name}</div>', unsafe_allow_html=True)
                     if tk in _added:
-                        continue
-                    with cols[idx]:
-                        if st.button(f"+ {tk}", key=f"qk_{tk}", help=f"Ajouter {name}"):
-                            # Si le ticker est prédéfini, activer la checkbox
+                        st.markdown(f'<div class="rp-added">{tk} ✓</div>', unsafe_allow_html=True)
+                    else:
+                        if st.button(tk, key=f"qk_{tk}", use_container_width=True):
                             if tk in _all_predefined:
                                 st.session_state.activated_tickers.add(tk)
                             else:
                                 st.session_state.custom_tickers.append(tk)
                                 sauvegarder_tickers_json(st.session_state.custom_tickers)
                             st.rerun()
-                    idx += 1
 
 
 # python -m streamlit run app.py
