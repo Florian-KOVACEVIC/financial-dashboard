@@ -1,10 +1,10 @@
 # Financial Dashboard
 
+**[Live Demo](https://financial-dashboard-florian-kovacevic.streamlit.app/)**
+
 Interactive financial dashboard for multi-asset analysis — equities, crypto, ETFs, indices and macro indicators.
 
 Built as a personal project to explore quantitative finance concepts through hands-on development.
-
-![Dashboard Overview](screenshots/overview.png)
 
 ## Features
 
@@ -28,8 +28,6 @@ Built as a personal project to explore quantitative finance concepts through han
 - DCA (Dollar Cost Averaging) backtesting
 - Strategy backtester with customizable parameters
 - Annual and monthly return heatmaps
-
-![Technical Analysis](screenshots/technical.png)
 
 ## Tech Stack
 
