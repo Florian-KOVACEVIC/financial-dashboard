@@ -507,29 +507,29 @@ def calcul_score_global(df, rf=0.03):
 
         # ── Sharpe (0–5) ─────────────────────────────────────
         sh = float(sharpes.get(t, 0))
-        if   sh >= 2.0: s_sharpe = 5.0
-        elif sh >= 1.5: s_sharpe = 4.0
-        elif sh >= 1.0: s_sharpe = 3.0
-        elif sh >= 0.5: s_sharpe = 2.0
+        if   sh >= 1.5: s_sharpe = 5.0
+        elif sh >= 1.0: s_sharpe = 4.0
+        elif sh >= 0.6: s_sharpe = 3.0
+        elif sh >= 0.2: s_sharpe = 2.0
         elif sh >= 0.0: s_sharpe = 1.0
         else:           s_sharpe = 0.0
 
         # ── Volatilité (0–5) — moins c'est mieux ────────────
         vol = float(vols.get(t, 999))
-        if   vol < 10:  s_vol = 5.0
-        elif vol < 20:  s_vol = 4.0
-        elif vol < 35:  s_vol = 3.0
-        elif vol < 55:  s_vol = 2.0
-        elif vol < 80:  s_vol = 1.0
+        if   vol < 15:  s_vol = 5.0
+        elif vol < 25:  s_vol = 4.0
+        elif vol < 40:  s_vol = 3.0
+        elif vol < 60:  s_vol = 2.0
+        elif vol < 90:  s_vol = 1.0
         else:           s_vol = 0.0
 
         # ── Drawdown max (0–5) — moins c'est mieux ───────────
         dd = float(((s - s.cummax()) / s.cummax() * 100).min())
-        if   dd > -10:  s_dd = 5.0
-        elif dd > -20:  s_dd = 4.0
-        elif dd > -35:  s_dd = 3.0
-        elif dd > -50:  s_dd = 2.0
-        elif dd > -70:  s_dd = 1.0
+        if   dd > -8:   s_dd = 5.0
+        elif dd > -15:  s_dd = 4.0
+        elif dd > -25:  s_dd = 3.0
+        elif dd > -40:  s_dd = 2.0
+        elif dd > -60:  s_dd = 1.0
         else:           s_dd = 0.0
 
         # ── Tendance 6 mois (0–5) ────────────────────────────
@@ -538,11 +538,11 @@ def calcul_score_global(df, rf=0.03):
         perf6  = (s.iloc[-1] / s.iloc[-n6]  - 1) * 100 if n6  > 0 else 0
         perf12 = (s.iloc[-1] / s.iloc[-n12] - 1) * 100 if n12 > 0 else 0
         tendance = (perf6 + perf12) / 2
-        if   tendance > 40:  s_tend = 5.0
-        elif tendance > 20:  s_tend = 4.0
-        elif tendance > 5:   s_tend = 3.0
-        elif tendance > -5:  s_tend = 2.0
-        elif tendance > -20: s_tend = 1.0
+        if   tendance > 25:  s_tend = 5.0
+        elif tendance > 10:  s_tend = 4.0
+        elif tendance > 0:   s_tend = 3.0
+        elif tendance > -10: s_tend = 2.0
+        elif tendance > -25: s_tend = 1.0
         else:                s_tend = 0.0
 
         # ── Score pondéré /20 ────────────────────────────────
@@ -749,14 +749,14 @@ def tracer_graphique_principal(affichage, df_raw, df_vol, echelle_log,
 # ════════════════════════════════════════════════════════════
 selection = []
 with st.sidebar:
-    st.header("⚙️ Paramètres")
-    st.subheader("📅 Période")
+    st.header("Paramètres")
+    st.subheader("Période")
     date_debut = st.date_input("Date de début", value=datetime(2016, 1, 1),
                                min_value=datetime(2000, 1, 1), max_value=date.today())
     date_fin = date.today()
     st.divider()
 
-    st.subheader("📐 Graphique")
+    st.subheader("Graphique")
     echelle_log    = st.toggle("Échelle logarithmique", value=False,
         help="En échelle normale, une hausse de +1000€ prend autant de place qu'elle parte de 100€ ou 10 000€.\n\n"
              "En échelle log, c'est le % de variation qui compte : +10% occupe toujours la même hauteur.\n\n"
@@ -805,7 +805,7 @@ with st.sidebar:
             if st.checkbox(t, value=t in DEFAUT): selection.append(t)
 
     st.divider()
-    st.subheader("➕ Ajouter un ticker")
+    st.subheader("Ajouter un ticker")
     st.caption("Tape le symbole et appuie sur **Entrée** ↵")
     custom_input = st.text_input("Symbole", key="custom_input_field",
                                  placeholder="Ex : TTWO, IBM...",
@@ -852,21 +852,21 @@ evenements_affiches = filtrer_evenements_proches([
 (onglet1, onglet_pf, onglet2, onglet3, onglet4, onglet5,
  onglet_screener, onglet_bt, onglet6, onglet_macro,
  onglet_news, onglet_alertes, onglet_cal, onglet_heat, onglet7) = st.tabs([
-    "📈 Graphique · Base 100",
-    "💼 Portefeuille · Simulation",
-    "🔁 Comparer · Périodes",
-    "🔥 Corrélations",
-    "📉 Drawdown · Risque",
-    "📊 Analyses · Sharpe",
-    "🔍 Screener · Score",
-    "⚗️ Backtest · Stratégies",
-    "🏢 Fiches · Fondamentaux",
-    "🌍 Macro · Taux & Indices",
-    "📰 Actualités",
-    "📬 Alertes · Prix",
-    "📆 Calendrier · Éco",
-    "🌐 Heatmap · Secteurs",
-    "📖 Glossaire · Recherche",
+    "Graphique",
+    "Portefeuille",
+    "Comparaison",
+    "Corrélations",
+    "Drawdown",
+    "Analyses",
+    "Screener",
+    "Backtest",
+    "Fiches",
+    "Macro",
+    "Actualités",
+    "Alertes",
+    "Calendrier",
+    "Heatmap",
+    "Recherche",
 ])
 
 
@@ -874,7 +874,7 @@ evenements_affiches = filtrer_evenements_proches([
 #  ONGLET 1 — GRAPHIQUE
 # ════════════════════════════════════════════════════════════
 with onglet1:
-    st.title("📈 Tableau de Bord Financier — Base 100")
+    st.title("Tableau de Bord Financier — Base 100")
     st.caption("Base 100 : tous les actifs démarrent à 100. Affiche 250 = +150% depuis le départ.")
     if df.empty:
         st.info("👈 Sélectionne au moins un actif.")
@@ -894,7 +894,7 @@ with onglet1:
             evenements_affiches, date_debut
         ), width="stretch")
 
-        st.subheader("📊 Performances")
+        st.subheader("Performances")
         cols = st.columns(min(len(b.columns), 4))
         for i, t in enumerate(b.columns):
             with cols[i % len(cols)]:
@@ -902,7 +902,7 @@ with onglet1:
                 st.metric(t, f"{val:.1f}", f"{val-100:+.1f}%",
                           help=f"1 000€ investis au départ = {1000*val/100:.0f}€ aujourd'hui.")
 
-        st.subheader("📉 Volatilité annualisée")
+        st.subheader("Volatilité annualisée")
         vol = calcul_volatilite(df)
         cols2 = st.columns(min(len(vol), 4))
         for i, t in enumerate(vol.index):
@@ -919,7 +919,7 @@ with onglet1:
 #  ONGLET PORTEFEUILLE
 # ════════════════════════════════════════════════════════════
 with onglet_pf:
-    st.title("💼 Simulateur de Portefeuille")
+    st.title("Simulateur de Portefeuille")
     st.caption("Construis un portefeuille en attribuant un pourcentage à chaque actif sélectionné.")
 
     if df.empty or len(df.columns) == 0:
@@ -956,7 +956,7 @@ with onglet_pf:
         #  TAB PORTEFEUILLE CLASSIQUE
         # ════════════════════════════════════════════════════
         with tab_pf:
-            st.subheader("1️⃣  Allocation du portefeuille")
+            st.subheader("1.  Allocation du portefeuille")
             st.caption("Modifie directement les valeurs dans le tableau. Le total doit faire 100%.")
 
             if st.button(
@@ -1000,7 +1000,7 @@ with onglet_pf:
                     st.warning(f"⚠️ **{total:.2f}%** (-{100-total:.2f}%)")
 
             st.divider()
-            st.subheader("2️⃣  Mise de départ")
+            st.subheader("2.  Mise de départ")
             mise_depart = st.number_input(
                 "Montant investi (€)", min_value=100, max_value=10_000_000,
                 value=10_000, step=100, format="%d", key="mise_classique"
@@ -1008,7 +1008,7 @@ with onglet_pf:
             st.divider()
 
             if abs(total - 100) < 0.01:
-                st.subheader("3️⃣  Évolution du portefeuille")
+                st.subheader("3.  Évolution du portefeuille")
 
                 poids_norm    = {t: poids[t] / 100 for t in actifs_dispo if poids[t] > 0}
                 actifs_actifs = list(poids_norm.keys())
@@ -1059,7 +1059,7 @@ with onglet_pf:
                 )
                 st.plotly_chart(fig_pf, width="stretch")
 
-                st.subheader("🥧 Répartition du portefeuille")
+                st.subheader("Répartition du portefeuille")
                 col_pie1, col_pie2 = st.columns([1, 1])
                 with col_pie1:
                     fig_pie = go.Figure(go.Pie(
@@ -1088,7 +1088,7 @@ with onglet_pf:
                         })
                     st.dataframe(pd.DataFrame(contribs).set_index("Actif"), width="stretch")
 
-                st.subheader("📅 Rendements annuels du portefeuille")
+                st.subheader("Rendements annuels du portefeuille")
                 pf_annuel = pf_valeur.resample("YE").last().pct_change().dropna() * 100
                 pf_annuel.index = pf_annuel.index.year
                 fig_bar = go.Figure(go.Bar(
@@ -1106,7 +1106,7 @@ with onglet_pf:
                 )
                 st.plotly_chart(fig_bar, width="stretch")
 
-                st.subheader("📉 Drawdown du portefeuille")
+                st.subheader("Drawdown du portefeuille")
                 dd_pf = (pf_valeur - pf_valeur.cummax()) / pf_valeur.cummax() * 100
                 fig_dd = go.Figure(go.Scatter(
                     x=dd_pf.index, y=dd_pf.values, fill="tozeroy",
@@ -1129,7 +1129,7 @@ with onglet_pf:
         #  TAB DCA
         # ════════════════════════════════════════════════════
         with tab_dca:
-            st.subheader("📅 Simulation DCA — Investissement régulier")
+            st.subheader("Simulation DCA — Investissement régulier")
             st.caption(
                 "Le DCA (Dollar-Cost Averaging) consiste à investir un montant fixe chaque mois, "
                 "quel que soit le prix. Tu achètes plus de parts quand les prix baissent, "
@@ -1249,7 +1249,7 @@ with onglet_pf:
 
                 # Comparaison DCA vs investissement unique
                 st.divider()
-                st.subheader("⚖️ DCA vs Investissement unique")
+                st.subheader("DCA vs Investissement unique")
                 st.caption("Que se serait-il passé si tu avais tout investi en une seule fois au départ ?")
 
                 prix_depart    = serie_dca.iloc[0]
@@ -1276,7 +1276,7 @@ with onglet_pf:
 
                 # Courbe prix de revient DCA dans le temps
                 st.divider()
-                st.subheader("📈 Évolution du prix de revient")
+                st.subheader("Évolution du prix de revient")
                 st.caption("Le prix de revient DCA converge progressivement vers une moyenne lissée du marché.")
                 prix_revient_ts = hist_df["investi"] / hist_df["parts"]
                 fig_pr = go.Figure()
@@ -1306,7 +1306,7 @@ with onglet_pf:
         #  TAB COMPARATEUR DE STRATÉGIES
         # ════════════════════════════════════════════════════
         with tab_cmp:
-            st.subheader("⚖️ Comparateur de stratégies")
+            st.subheader("Comparateur de stratégies")
             st.caption(
                 "Construis jusqu'à 4 portefeuilles hypothétiques et compare leurs performances "
                 "sur la même période avec les mêmes métriques. "
@@ -1463,7 +1463,7 @@ with onglet_pf:
                         df_strats = pd.DataFrame(series_pf).dropna(how="all")
 
                         # ── Graphique base 100 ────────────────────
-                        st.subheader("📈 Évolution — Base 100")
+                        st.subheader("Évolution — Base 100")
                         fig_cmp = go.Figure()
                         for j, nom in enumerate(df_strats.columns):
                             c = COULEURS_STRAT[j % len(COULEURS_STRAT)]
@@ -1491,7 +1491,7 @@ with onglet_pf:
                             r, g, b = int(h[0:2],16), int(h[2:4],16), int(h[4:6],16)
                             return f"rgba({r},{g},{b},{alpha})"
 
-                        st.subheader("📉 Drawdown comparé")
+                        st.subheader("Drawdown comparé")
                         fig_dd = go.Figure()
                         for j, nom in enumerate(df_strats.columns):
                             s    = df_strats[nom].dropna()
@@ -1517,7 +1517,7 @@ with onglet_pf:
                         st.plotly_chart(fig_dd, width="stretch")
 
                         # ── Tableau des métriques ─────────────────
-                        st.subheader("📊 Métriques comparées")
+                        st.subheader("Métriques comparées")
                         lignes = []
                         for j, nom in enumerate(df_strats.columns):
                             s  = df_strats[nom].dropna()
@@ -1572,7 +1572,7 @@ with onglet_pf:
                         )
 
                         # ── Rendements annuels côte à côte ────────
-                        st.subheader("📅 Rendements annuels")
+                        st.subheader("Rendements annuels")
                         ann_data = {}
                         for nom in df_strats.columns:
                             s   = df_strats[nom].dropna()
@@ -1603,7 +1603,7 @@ with onglet_pf:
 
                         # ── Corrélation entre stratégies ──────────
                         if len(df_strats.columns) > 1:
-                            st.subheader("🔗 Corrélation entre stratégies")
+                            st.subheader("Corrélation entre stratégies")
                             corr = df_strats.pct_change().dropna().corr().round(2)
                             fig_corr = go.Figure(go.Heatmap(
                                 z=corr.values, x=corr.columns, y=corr.index,
@@ -1623,7 +1623,7 @@ with onglet_pf:
                             )
 # ════════════════════════════════════════════════════════════
 with onglet2:
-    st.title("🔁 Comparer deux périodes")
+    st.title("Comparer deux périodes")
     if not selection:
         st.info("👈 Sélectionne des actifs.")
     else:
@@ -1673,7 +1673,7 @@ with onglet2:
 #  ONGLET 3 — CORRÉLATIONS
 # ════════════════════════════════════════════════════════════
 with onglet3:
-    st.title("🔥 Corrélations entre actifs")
+    st.title("Corrélations entre actifs")
     st.caption("1.0 = évoluent ensemble. -1.0 = sens inverse. Pour diversifier, cherche des actifs peu corrélés.")
     if df.empty or len(df.columns) < 2:
         st.info("👈 Sélectionne au moins 2 actifs.")
@@ -1690,10 +1690,10 @@ with onglet3:
         paires_df = pd.DataFrame(paires, columns=["Actif 1","Actif 2","Corrélation"]).sort_values("Corrélation", ascending=False)
         col1, col2 = st.columns(2)
         with col1:
-            st.subheader("💚 Plus corrélés")
+            st.subheader("Plus corrélés")
             st.dataframe(paires_df.head(5).reset_index(drop=True), width="stretch")
         with col2:
-            st.subheader("❤️ Moins corrélés")
+            st.subheader("Moins corrélés")
             st.dataframe(paires_df.tail(5).reset_index(drop=True), width="stretch")
 
 
@@ -1701,7 +1701,7 @@ with onglet3:
 #  ONGLET 4 — DRAWDOWN
 # ════════════════════════════════════════════════════════════
 with onglet4:
-    st.title("📉 Drawdown Maximum")
+    st.title("Drawdown Maximum")
     st.caption("Le drawdown max, c'est la pire chute qu'un actif a subie depuis son dernier sommet. "
         "Par exemple, -80% signifie qu'à un moment donné, l'actif avait perdu 80% de sa valeur maximale. "
         "C'est une mesure du risque réel que tu aurais vécu en le détenant.")
@@ -1728,22 +1728,23 @@ with onglet4:
             yaxis=dict(tickformat=".0f", gridcolor="rgba(255,255,255,0.08)"))
         st.plotly_chart(fig_dd, width="stretch")
         st.caption(f"Drawdown max : **{courbe_dd.min():.1f}%**")
-        st.dataframe(pd.DataFrame({"Ticker": drawdowns.index, "Drawdown Max (%)": drawdowns.values})
-                     .sort_values("Drawdown Max (%)").set_index("Ticker"), width="stretch")
+        df_dd_tab = pd.DataFrame({"Ticker": drawdowns.index, "Drawdown Max (%)": drawdowns.values})
+        df_dd_tab["Drawdown Max (%)"] = df_dd_tab["Drawdown Max (%)"].map(lambda x: f"{x:.2f}")
+        st.dataframe(df_dd_tab.sort_values("Drawdown Max (%)").set_index("Ticker"), width="stretch")
 
 
 # ════════════════════════════════════════════════════════════
 #  ONGLET 5 — ANALYSES
 # ════════════════════════════════════════════════════════════
 with onglet5:
-    st.title("📊 Analyses approfondies")
+    st.title("Analyses approfondies")
     if df.empty:
         st.info("👈 Sélectionne des actifs.")
     else:
         # ════════════════════════════════════════════════════
         #  SCORE GLOBAL
         # ════════════════════════════════════════════════════
-        st.subheader("🏆 Score global par actif")
+        st.subheader("Score global par actif")
         st.caption(
             "Note sur 20 combinant 4 critères financiers pondérés : "
             "**Sharpe 40%** · **Volatilité 25%** · **Drawdown 25%** · **Tendance 10%**"
@@ -1837,7 +1838,7 @@ with onglet5:
         # ════════════════════════════════════════════════════
         #  SHARPE
         # ════════════════════════════════════════════════════
-        st.subheader("⚡ Ratio de Sharpe")
+        st.subheader("Ratio de Sharpe")
         st.caption("Mesure si la performance est 'méritée' par rapport au risque pris.\n\n"
                    "• < 0.5 : mauvais\n• 0.5–1 : correct\n• 1–2 : bon\n• > 2 : excellent")
         sharpe = calcul_sharpe(df)
@@ -1849,7 +1850,7 @@ with onglet5:
                 st.metric(t, f"{val:.2f}", niv)
         st.divider()
 
-        st.subheader("📅 Rendements annuels (%)")
+        st.subheader("Rendements annuels (%)")
         ra = calcul_rendements_annuels(df)
         if not ra.empty:
             def cp(val):
@@ -1861,7 +1862,7 @@ with onglet5:
             st.dataframe(ra.style.map(cp).format("{:+.1f}%"), width="stretch")
         st.divider()
 
-        st.subheader("🗓️ Meilleur & Pire mois")
+        st.subheader("Meilleur & Pire mois")
         mp = calcul_meilleur_pire_mois(df)
         if mp:
             cols_mp = st.columns(min(len(mp), 3))
@@ -1876,7 +1877,7 @@ with onglet5:
 #  ONGLET SCREENER
 # ════════════════════════════════════════════════════════════
 with onglet_screener:
-    st.title("🔍 Screener d'actifs")
+    st.title("Screener d'actifs")
     st.caption(
         "Filtre tes actifs sélectionnés selon des critères combinés. "
         "Seuls les actifs qui passent **tous** les filtres activés sont affichés."
@@ -1919,7 +1920,7 @@ with onglet_screener:
         df_sc = pd.DataFrame(lignes_sc)
 
         st.divider()
-        st.subheader("⚙️ Filtres")
+        st.subheader("Filtres")
 
         with st.expander("🎛️ Configurer les filtres", expanded=True):
             fc1, fc2, fc3 = st.columns(3)
@@ -2006,7 +2007,7 @@ with onglet_screener:
 
             st.divider()
             # Tableau complet
-            st.subheader("📋 Tableau détaillé")
+            st.subheader("Tableau détaillé")
             def color_score(val):
                 if pd.isna(val): return ""
                 if val >= 16: return "background-color:#7a6000;color:white"
@@ -2040,7 +2041,7 @@ with onglet_screener:
 #  ONGLET BACKTESTING
 # ════════════════════════════════════════════════════════════
 with onglet_bt:
-    st.title("⚗️ Backtesting de stratégie")
+    st.title("Backtesting de stratégie")
     st.caption(
         "Teste une règle d'entrée/sortie sur l'historique et compare la performance "
         "à un simple Buy & Hold. Les frais ne sont pas simulés."
@@ -2053,7 +2054,7 @@ with onglet_bt:
         serie_bt  = df[bt_ticker].dropna()
 
         st.divider()
-        st.subheader("⚙️ Règles de la stratégie")
+        st.subheader("Règles de la stratégie")
 
         # ── Choix de la stratégie ─────────────────────────────
         strategie = st.selectbox("Stratégie", [
@@ -2251,7 +2252,7 @@ with onglet_bt:
 #  ONGLET 6 — FICHES ACTIFS
 # ════════════════════════════════════════════════════════════
 with onglet6:
-    st.title("🏢 Fiches actifs")
+    st.title("Fiches actifs")
     if not selection:
         st.info("👈 Sélectionne des actifs.")
     else:
@@ -2299,7 +2300,7 @@ with onglet6:
                 st.divider()
 
                 # ── Consensus analystes ───────────────────────────
-                st.subheader("🎯 Consensus analystes")
+                st.subheader("Consensus analystes")
                 reco   = fiche.get("Reco label", "—")
                 color  = fiche.get("Reco color", "#888")
                 nb_ana = fiche.get("Nb analystes")
@@ -2331,7 +2332,7 @@ with onglet6:
                 st.divider()
 
                 # ── Dates importantes ─────────────────────────────
-                st.subheader("📅 Prochaines dates importantes")
+                st.subheader("Prochaines dates importantes")
                 cd1, cd2, cd3 = st.columns(3)
                 ex_div = fiche.get("Ex-dividende")
                 if ex_div:
@@ -2357,7 +2358,7 @@ with onglet6:
             #  SOUS-ONGLET DCF
             # ════════════════════════════════════════════════
             with tab_dcf:
-                st.subheader(f"🔬 Valorisation DCF — {fiche.get('Nom', ticker_fiche)}")
+                st.subheader(f"Valorisation DCF — {fiche.get('Nom', ticker_fiche)}")
                 st.caption(
                     "Estimation de la **valeur intrinsèque** par actualisation des flux de trésorerie (DCF simplifié). "
                     "Les hypothèses sont paramétrables. Ce modèle est indicatif — il ne remplace pas une analyse professionnelle."
@@ -2410,7 +2411,9 @@ with onglet6:
                 taux_actu = p4.slider(
                     "Taux d'actualisation / WACC (%)", 5.0, 20.0, float(min(wacc_default, 15.0)), 0.5,
                     help=f"Coût du capital. Calculé à partir du beta ({beta:.2f}) : rf 5% + prime risque.\n"
-                         f"Élevé = plus sévère. Standard : 8–12%.")
+                         f"Élevé = plus sévère. Standard : 8–12%." if beta else
+                    "Coût du capital. Beta indisponible, valeur par défaut utilisée (10%).\n"
+                    "Élevé = plus sévère. Standard : 8–12%.")
                 marge_secu = p5.slider(
                     "Marge de sécurité (%)", 0, 50, 25, 5,
                     help="Décote appliquée à la valeur intrinsèque calculée. "
@@ -2605,7 +2608,7 @@ with onglet6:
 #  ONGLET MACRO
 # ════════════════════════════════════════════════════════════
 with onglet_macro:
-    st.title("🌍 Tableau de Bord Macro")
+    st.title("Tableau de Bord Macro")
     st.caption(
         "Vue d'ensemble des grands indicateurs macroéconomiques : sentiment de marché, indices actions, "
         "devises, matières premières, taux et obligations. Données rafraîchies toutes les 15 min."
@@ -2725,7 +2728,7 @@ with onglet_macro:
 
     # ── Section analyse : courbe de taux US (yield curve) ────
     if "🏦 Taux & Obligations" in cats_choisies:
-        st.subheader("📐 Courbe des taux US (Yield Curve)")
+        st.subheader("Courbe des taux US (Yield Curve)")
         st.caption(
             "Quand les taux courts dépassent les taux longs (courbe inversée), "
             "c'est historiquement un signal précurseur de récession (avec 12–18 mois de délai)."
@@ -2778,7 +2781,7 @@ with onglet_macro:
         st.divider()
 
     # ── Tableau récapitulatif téléchargeable ──────────────────
-    st.subheader("📋 Tableau récapitulatif")
+    st.subheader("Tableau récapitulatif")
     lignes = []
     for cat in cats_choisies:
         for inst in MACRO_CATALOGUE[cat]:
@@ -2803,7 +2806,7 @@ with onglet_macro:
 #  ONGLET NEWS — ACTUALITÉS
 # ════════════════════════════════════════════════════════════
 with onglet_news:
-    st.title("📰 Actualités financières")
+    st.title("Actualités financières")
     st.caption("Dernières nouvelles issues de Yahoo Finance pour chaque actif sélectionné.")
 
     if not selection:
@@ -2877,7 +2880,7 @@ with onglet_news:
 #  ONGLET ALERTES
 # ════════════════════════════════════════════════════════════
 with onglet_alertes:
-    st.title("📬 Alertes de prix")
+    st.title("Alertes de prix")
     st.caption(
         "Configure des seuils de prix pour tes actifs. "
         "À chaque chargement de l'app, les alertes déclenchées s'affichent en haut de cet onglet."
@@ -2919,7 +2922,7 @@ with onglet_alertes:
 
         # ── Affichage des alertes déclenchées ──────────────────
         if alertes_declenchees:
-            st.subheader(f"🚨 {len(alertes_declenchees)} alerte(s) déclenchée(s) !")
+            st.subheader(f"{len(alertes_declenchees)} alerte(s) déclenchée(s) !")
             for al in alertes_declenchees:
                 st.markdown(
                     f"<div style='border-left: 4px solid {al['color']}; "
@@ -2935,7 +2938,7 @@ with onglet_alertes:
             st.divider()
 
         # ── Configuration des alertes ──────────────────────────
-        st.subheader("⚙️ Configurer les seuils")
+        st.subheader("Configurer les seuils")
 
         # Actifs disponibles : sélection + tickers déjà en alerte
         tickers_disponibles = sorted(set(selection) | set(st.session_state.alertes.keys()))
@@ -3012,7 +3015,7 @@ with onglet_alertes:
 
         # ── Récapitulatif de toutes les alertes ────────────────
         if st.session_state.alertes:
-            st.subheader("📋 Toutes les alertes actives")
+            st.subheader("Toutes les alertes actives")
             lignes_al = []
             for tk_a, cfg in st.session_state.alertes.items():
                 lignes_al.append({
@@ -3037,7 +3040,7 @@ with onglet_alertes:
 #  ONGLET CALENDRIER ÉCONOMIQUE
 # ════════════════════════════════════════════════════════════
 with onglet_cal:
-    st.title("📆 Calendrier Économique")
+    st.title("Calendrier Économique")
     st.caption("Prochains événements macro majeurs : banques centrales, inflation, emploi, résultats d'entreprises.")
 
     # ── Données statiques enrichies ───────────────────────────
@@ -3335,7 +3338,7 @@ with onglet_cal:
 #  ONGLET HEATMAP SECTORIELLE
 # ════════════════════════════════════════════════════════════
 with onglet_heat:
-    st.title("🌐 Carte Thermique Sectorielle")
+    st.title("Carte Thermique Sectorielle")
     st.caption(
         "Performance des secteurs S&P 500 sur la période choisie. "
         "Vert = hausse · Rouge = baisse · Taille des cases = capitalisation boursière relative."
@@ -3475,7 +3478,7 @@ with onglet_heat:
                 st.plotly_chart(fig_tree, width="stretch")
 
                 # ── Barre de performance triée ─────────────────
-                st.subheader("📊 Classement des secteurs")
+                st.subheader("Classement des secteurs")
                 perfs_tri = sorted(perfs.items(), key=lambda x: x[1], reverse=True)
                 noms_tri  = [f"{SECTEURS[tk]['icone']} {SECTEURS[tk]['nom']}" for tk, _ in perfs_tri]
                 vals_tri  = [v for _, v in perfs_tri]
@@ -3503,7 +3506,7 @@ with onglet_heat:
                 st.plotly_chart(fig_bar, width="stretch")
 
                 # ── Tableau récap ──────────────────────────────
-                st.subheader("📋 Tableau récapitulatif")
+                st.subheader("Tableau récapitulatif")
                 rows = []
                 for tk, perf in perfs_tri:
                     s    = df_heat[tk].dropna()
@@ -3596,7 +3599,7 @@ with onglet_heat:
 
             # ── Rotation sectorielle (sparklines) ─────────────────
             st.divider()
-            st.subheader("📈 Évolution mensuelle des secteurs")
+            st.subheader("Évolution mensuelle des secteurs")
             st.caption("Rendements mensuels par secteur — identifie les rotations et cycles sectoriels.")
 
             df_mens = df_heat[list(perfs.keys())].resample("ME").last().pct_change().dropna() * 100
@@ -3636,7 +3639,7 @@ with onglet_heat:
 #  ONGLET 7 — GLOSSAIRE
 # ════════════════════════════════════════════════════════════
 with onglet7:
-    st.title("📖 Recherche de tickers Yahoo Finance")
+    st.title("Recherche de tickers Yahoo Finance")
     st.caption("Tape un nom d'entreprise, un symbole, ou même une approximation.")
     recherche = st.text_input("🔍 Rechercher", placeholder="Ex : Take Two, IBM, bitcoin...").strip()
     if recherche:
