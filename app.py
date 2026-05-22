@@ -1310,7 +1310,16 @@ with onglet_pf:
                 diff = valeur_finale - valeur_lump
                 if abs(diff) > 1:
                     gagnant = "DCA" if diff > 0 else "Lump Sum"
-                    st.info(f"Sur cette période, le **{gagnant}** aurait rapporté **{abs(diff):,.0f} €** de plus.")
+                    perdant = "Lump Sum" if diff > 0 else "DCA"
+                    # Les deux perdent de l'argent
+                    if gain_dca < 0 and gain_lump < 0:
+                        st.warning(f"Les deux stratégies sont en perte. Le **{gagnant}** a limité les dégâts avec **{abs(diff):,.0f} €** de perte en moins que le {perdant}.")
+                    # Le gagnant gagne, le perdant perd
+                    elif (diff > 0 and gain_lump < 0) or (diff < 0 and gain_dca < 0):
+                        st.info(f"Le **{gagnant}** termine en gain, tandis que le **{perdant}** est en perte. Écart de **{abs(diff):,.0f} €**.")
+                    # Les deux gagnent
+                    else:
+                        st.success(f"Sur cette période, le **{gagnant}** aurait généré **{abs(diff):,.0f} €** de plus que le {perdant}.")
 
                 # Courbe prix de revient DCA dans le temps
                 st.divider()
