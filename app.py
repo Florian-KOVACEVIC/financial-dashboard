@@ -170,8 +170,9 @@ if "custom_tickers"   not in st.session_state:
 if "custom_input_val" not in st.session_state:
     st.session_state.custom_input_val = ""
 if "alertes" not in st.session_state:
-    # { "AAPL": {"above": 200.0, "below": 150.0}, ... }
     st.session_state.alertes = {}
+if "activated_tickers" not in st.session_state:
+    st.session_state.activated_tickers = set()
 
 
 # ════════════════════════════════════════════════════════════
@@ -799,10 +800,14 @@ with st.sidebar:
              "👉 Visualise comment tes actifs ont réagi aux crises passées.")
     st.divider()
 
+    # Construire le set des tickers pré-définis pour référence
+    _all_predefined = set()
     for cat, liste in TICKERS_APP.items():
+        _all_predefined.update(liste)
         st.subheader(cat)
         for t in liste:
-            if st.checkbox(t, value=t in DEFAUT): selection.append(t)
+            if st.checkbox(t, value=t in DEFAUT or t in st.session_state.activated_tickers):
+                selection.append(t)
 
     st.divider()
     st.subheader("Ajouter un actif")
@@ -3740,27 +3745,20 @@ with onglet7:
         # CSS pour le tableau
         st.markdown("""
         <style>
-        .rp-table{width:100%;table-layout:fixed;border-collapse:separate;border-spacing:0;border-radius:10px;overflow:hidden;
-                   border:1px solid rgba(255,255,255,0.08);margin-bottom:8px;}
-        .rp-table td{padding:0;text-align:center;font-size:.75rem;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+        .rp-table{width:100%;table-layout:fixed;border-collapse:collapse;border-radius:10px;overflow:hidden;
+                   border:1px solid rgba(255,255,255,0.08);margin-bottom:12px;}
+        .rp-table td{padding:0;text-align:center;font-size:.75rem;overflow:hidden;text-overflow:ellipsis;
+                     white-space:nowrap;border:1px solid rgba(255,255,255,0.06);}
         .rp-cat{background:rgba(255,255,255,0.04);padding:12px 16px!important;text-align:left!important;
                 font-weight:600;font-size:.78rem;color:rgba(255,255,255,0.85);vertical-align:middle;
-                border-right:1px solid rgba(255,255,255,0.06);width:130px;min-width:130px;}
-        .rp-name{background:rgba(255,255,255,0.02);padding:6px 4px!important;
-                 color:rgba(255,255,255,0.45);font-size:.68rem;font-weight:400;
-                 border-bottom:none;letter-spacing:.2px;}
-        .rp-tick{background:transparent;padding:4px 4px 8px!important;}
-        .rp-tick a{color:#5b9ef5;font-family:'DM Mono',monospace;font-size:.73rem;font-weight:500;
-                   text-decoration:none;cursor:pointer;padding:3px 8px;border-radius:5px;
-                   border:1px solid rgba(91,158,245,0.15);transition:all .15s;display:inline-block;}
-        .rp-tick a:hover{background:rgba(91,158,245,0.1);border-color:rgba(91,158,245,0.35);color:#93bbfc;}
-        .rp-tick .added{color:rgba(255,255,255,0.25);font-family:'DM Mono',monospace;font-size:.73rem;
-                        font-weight:400;padding:3px 8px;border-radius:5px;
-                        border:1px solid rgba(255,255,255,0.05);display:inline-block;}
+                width:130px;min-width:130px;}
+        .rp-name{background:rgba(255,255,255,0.025);padding:7px 4px!important;
+                 color:rgba(255,255,255,0.45);font-size:.68rem;font-weight:400;letter-spacing:.2px;}
+        .rp-tick{background:rgba(0,0,0,0.15);padding:7px 4px!important;}
         </style>
         """, unsafe_allow_html=True)
 
-        # Collecter les tickers déjà ajoutés pour le rendu HTML
+        # Collecter les tickers déjà actifs
         _added = set(st.session_state.custom_tickers) | set(selection)
 
         for cat_name, items in _cats:
@@ -3769,9 +3767,9 @@ with onglet7:
             for name, tk in items:
                 names_cells += f'<td class="rp-name">{name}</td>'
                 if tk in _added:
-                    ticks_cells += f'<td class="rp-tick"><span class="added">{tk} ✓</span></td>'
+                    ticks_cells += f'<td class="rp-tick"><span style="color:rgba(255,255,255,0.25);font-family:\'DM Mono\',monospace;font-size:.72rem">{tk} ✓</span></td>'
                 else:
-                    ticks_cells += f'<td class="rp-tick"><a id="rp_{tk}">{tk}</a></td>'
+                    ticks_cells += f'<td class="rp-tick"><span style="color:#5b9ef5;font-family:\'DM Mono\',monospace;font-size:.72rem;font-weight:500">{tk}</span></td>'
 
             st.markdown(f"""
             <table class="rp-table">
@@ -3779,20 +3777,25 @@ with onglet7:
               <tr>{ticks_cells}</tr>
             </table>""", unsafe_allow_html=True)
 
-        # Ajout rapide par sélection
-        all_items = [(f"{name}  ({tk})", tk) for _, items in _cats for name, tk in items if tk not in _added]
-        if all_items:
-            st.divider()
-            c1, c2 = st.columns([4, 1])
-            labels = [x[0] for x in all_items]
-            chosen = c1.selectbox("Ajout rapide", labels, index=None,
-                                  placeholder="Sélectionner un actif à ajouter...",
-                                  label_visibility="collapsed")
-            if chosen and c2.button("Ajouter", key="qk_add_btn"):
-                tk = dict(all_items)[chosen]
-                st.session_state.custom_tickers.append(tk)
-                sauvegarder_tickers_json(st.session_state.custom_tickers)
-                st.rerun()
+        # Boutons cliquables par catégorie
+        for cat_name, items in _cats:
+            tickers_dispo = [(name, tk) for name, tk in items if tk not in _added]
+            if tickers_dispo:
+                cols = st.columns(len(items))
+                idx = 0
+                for name, tk in items:
+                    if tk in _added:
+                        continue
+                    with cols[idx]:
+                        if st.button(f"+ {tk}", key=f"qk_{tk}", help=f"Ajouter {name}"):
+                            # Si le ticker est prédéfini, activer la checkbox
+                            if tk in _all_predefined:
+                                st.session_state.activated_tickers.add(tk)
+                            else:
+                                st.session_state.custom_tickers.append(tk)
+                                sauvegarder_tickers_json(st.session_state.custom_tickers)
+                            st.rerun()
+                    idx += 1
 
 
 # python -m streamlit run app.py
