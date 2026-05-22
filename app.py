@@ -173,6 +173,8 @@ if "alertes" not in st.session_state:
     st.session_state.alertes = {}
 if "activated_tickers" not in st.session_state:
     st.session_state.activated_tickers = set()
+if "deactivated_tickers" not in st.session_state:
+    st.session_state.deactivated_tickers = set()
 
 
 # ════════════════════════════════════════════════════════════
@@ -806,11 +808,14 @@ with st.sidebar:
         _all_predefined.update(liste)
         st.subheader(cat)
         for t in liste:
-            # Activer la checkbox si demandé depuis le glossaire
             cb_key = f"cb_{t}"
+            # Activer/désactiver la checkbox si demandé depuis le glossaire
             if t in st.session_state.activated_tickers:
                 st.session_state[cb_key] = True
                 st.session_state.activated_tickers.discard(t)
+            if t in st.session_state.deactivated_tickers:
+                st.session_state[cb_key] = False
+                st.session_state.deactivated_tickers.discard(t)
             if st.checkbox(t, value=t in DEFAUT, key=cb_key):
                 selection.append(t)
 
@@ -3768,10 +3773,9 @@ with onglet7:
                     st.markdown(f'<div class="rp-nm">{name}</div>', unsafe_allow_html=True)
                     if tk in _added:
                         if st.button(f"{tk} ✓", key=f"qk_{tk}", use_container_width=True):
-                            # Désélectionner : décocher la checkbox ou retirer des custom
+                            # Désélectionner via le set (appliqué au prochain rerun)
                             if tk in _all_predefined:
-                                cb_key = f"cb_{tk}"
-                                st.session_state[cb_key] = False
+                                st.session_state.deactivated_tickers.add(tk)
                             else:
                                 if tk in st.session_state.custom_tickers:
                                     st.session_state.custom_tickers.remove(tk)
