@@ -93,9 +93,9 @@ st.html("""
 """)
 
 TICKERS_APP = {
-    "🏢 Actions":  ["NVDA", "AAPL", "MSFT", "GOOGL", "TSLA", "META", "AMZN"],
-    "₿ Crypto":   ["BTC-USD", "ETH-USD", "SOL-USD"],
-    "📊 Indices":  ["^GSPC", "^IXIC", "^FCHI", "^N225"],
+    "Actions":  ["NVDA", "AAPL", "MSFT", "GOOGL", "TSLA", "META", "AMZN"],
+    "Crypto":   ["BTC-USD", "ETH-USD", "SOL-USD"],
+    "Indices":  ["^GSPC", "^IXIC", "^FCHI", "^N225"],
 }
 
 DEFAUT = {"AAPL"}
@@ -609,9 +609,9 @@ def ajouter_ticker(ticker: str):
             st.session_state._last_added = None
 
 TYPE_LABELS = {
-    "EQUITY": "📈 Action", "ETF": "💱 ETF", "MUTUALFUND": "💼 Fonds",
-    "CRYPTOCURRENCY": "₿ Crypto", "INDEX": "📊 Indice",
-    "FUTURE": "🛢 Future", "CURRENCY": "💱 Devise",
+    "EQUITY": "Action", "ETF": "ETF", "MUTUALFUND": "Fonds",
+    "CRYPTOCURRENCY": "Crypto", "INDEX": "Indice",
+    "FUTURE": "Future", "CURRENCY": "Devise",
 }
 
 
@@ -805,21 +805,44 @@ with st.sidebar:
             if st.checkbox(t, value=t in DEFAUT): selection.append(t)
 
     st.divider()
-    st.subheader("Ajouter un ticker")
-    st.caption("Tape le symbole et appuie sur **Entrée** ↵")
-    custom_input = st.text_input("Symbole", key="custom_input_field",
-                                 placeholder="Ex : TTWO, IBM...",
-                                 label_visibility="collapsed").strip().upper()
+    st.subheader("Ajouter un actif")
+    st.caption("Tape un symbole ou un nom d'entreprise")
+    custom_input = st.text_input("Recherche", key="custom_input_field",
+                                 placeholder="Ex : TTWO, IBM, Total, bitcoin...",
+                                 label_visibility="collapsed").strip()
     if custom_input and custom_input != st.session_state.custom_input_val:
         st.session_state.custom_input_val = custom_input
-        ajouter_ticker(custom_input)
-        st.rerun()
-    # Après rerun, Streamlit repasse ici avec le champ encore rempli
-    # → on ignore silencieusement si le ticker est déjà traité
+        # Essayer d'abord comme symbole exact
+        ticker_upper = custom_input.upper()
+        if verifier_ticker(ticker_upper):
+            ajouter_ticker(ticker_upper)
+            st.rerun()
+        else:
+            # Sinon rechercher par nom
+            resultats = rechercher_tickers(custom_input)
+            if resultats and len(resultats) == 1:
+                ajouter_ticker(resultats[0]["symbol"])
+                st.rerun()
+            elif resultats:
+                st.session_state._sidebar_results = resultats
+            else:
+                st.session_state._add_msg = ("error", f"Aucun résultat pour '{custom_input}'.")
+                st.rerun()
     if hasattr(st.session_state, "_add_msg"):
         lv, msg = st.session_state._add_msg
         getattr(st, lv)(msg)
         del st.session_state._add_msg
+    if hasattr(st.session_state, "_sidebar_results"):
+        for r in st.session_state._sidebar_results[:5]:
+            c1, c2 = st.columns([3, 1])
+            c1.caption(f"**{r['symbol']}** — {r['name']}")
+            if c2.button("+", key=f"sbadd_{r['symbol']}"):
+                ajouter_ticker(r["symbol"])
+                del st.session_state._sidebar_results
+                st.rerun()
+        if st.button("Fermer", key="sb_close_results"):
+            del st.session_state._sidebar_results
+            st.rerun()
     if st.session_state.custom_tickers:
         st.markdown("**Tickers ajoutés :**")
         for t in st.session_state.custom_tickers.copy():
@@ -3639,39 +3662,75 @@ with onglet_heat:
 #  ONGLET 7 — GLOSSAIRE
 # ════════════════════════════════════════════════════════════
 with onglet7:
-    st.title("Recherche de tickers Yahoo Finance")
-    st.caption("Tape un nom d'entreprise, un symbole, ou même une approximation.")
-    recherche = st.text_input("🔍 Rechercher", placeholder="Ex : Take Two, IBM, bitcoin...").strip()
+    st.title("Recherche d'actifs")
+    st.caption("Recherche par nom, symbole ou mot-clé — les résultats affichent un aperçu en temps réel.")
+    recherche = st.text_input("Rechercher", placeholder="Ex : Take Two, IBM, bitcoin, CAC 40, gold...",
+                              label_visibility="collapsed").strip()
     if recherche:
         with st.spinner("Recherche..."):
             resultats = rechercher_tickers(recherche)
         if not resultats:
             st.warning("Aucun résultat.")
         else:
-            st.success(f"{len(resultats)} résultat(s)")
-            st.divider()
+            st.caption(f"{len(resultats)} résultat(s)")
             for r in resultats:
-                c1,c2,c3 = st.columns([1.5,4,1.5])
-                c1.markdown(f"### `{r['symbol']}`")
-                c2.markdown(f"**{r['name']}**")
-                c2.caption(f"{TYPE_LABELS.get(r['type'], r['type'])} · {r['exchange']}")
-                if c3.button("➕ Ajouter", key=f"add_{r['symbol']}"):
-                    if r["symbol"] not in st.session_state.custom_tickers:
-                        st.session_state.custom_tickers.append(r["symbol"])
+                sym = r["symbol"]
+                type_label = TYPE_LABELS.get(r['type'], r['type'])
+                already = sym in st.session_state.custom_tickers or sym in selection
+
+                # Aperçu rapide du prix
+                try:
+                    tk_info = yf.Ticker(sym).fast_info
+                    prix = tk_info.get("last_price") or tk_info.get("regularMarketPrice")
+                    prev = tk_info.get("previous_close") or tk_info.get("regularMarketPreviousClose")
+                    var = ((prix - prev) / prev * 100) if prix and prev else None
+                except Exception:
+                    prix, var = None, None
+
+                c1, c2, c3, c4 = st.columns([1.5, 3.5, 2, 1.5])
+                c1.markdown(f"**`{sym}`**")
+                c2.markdown(f"{r['name']}")
+                c2.caption(f"{type_label} · {r['exchange']}")
+
+                if prix:
+                    var_color = "#2d9e5f" if var and var >= 0 else "#e05252"
+                    var_str = f"{var:+.2f}%" if var else ""
+                    c3.markdown(f"**{prix:.2f}** <span style='color:{var_color};font-size:0.85rem'>{var_str}</span>",
+                                unsafe_allow_html=True)
+                else:
+                    c3.caption("—")
+
+                if already:
+                    c4.success("Ajouté", icon="✓")
+                else:
+                    if c4.button("Ajouter", key=f"add_{sym}"):
+                        st.session_state.custom_tickers.append(sym)
                         sauvegarder_tickers_json(st.session_state.custom_tickers)
-                        st.success(f"✅ {r['symbol']} ajouté !")
                         st.rerun()
-                    else:
-                        st.info("Déjà ajouté.")
                 st.divider()
     else:
-        st.markdown("""
-        **Exemples :**
-        - `Take Two` → `TTWO`
-        - `Total` → `TTE.PA`
-        - `bitcoin` → `BTC-USD`
-        - `CAC` → `^FCHI`
-        """)
+        # Catégories de recherche rapide
+        st.markdown("**Recherches populaires**")
+        _cats = {
+            "Tech US": ["AAPL", "MSFT", "GOOGL", "NVDA", "META", "AMZN", "TSLA"],
+            "Finance": ["JPM", "GS", "BLK", "MS", "BAC", "V", "MA"],
+            "Europe": ["MC.PA", "SAP.DE", "ASML.AS", "SAN.PA", "OR.PA", "TTE.PA"],
+            "Crypto": ["BTC-USD", "ETH-USD", "SOL-USD", "BNB-USD", "XRP-USD"],
+            "Indices": ["^GSPC", "^IXIC", "^DJI", "^FCHI", "^GDAXI", "^N225"],
+            "Matières premières": ["GC=F", "SI=F", "CL=F", "NG=F"],
+        }
+        for cat_name, cat_tickers in _cats.items():
+            st.caption(f"**{cat_name}**")
+            cols = st.columns(len(cat_tickers))
+            for col, tk in zip(cols, cat_tickers):
+                already = tk in st.session_state.custom_tickers or tk in selection
+                if already:
+                    col.button(f"{tk} ✓", key=f"qk_{tk}", disabled=True)
+                else:
+                    if col.button(tk, key=f"qk_{tk}"):
+                        st.session_state.custom_tickers.append(tk)
+                        sauvegarder_tickers_json(st.session_state.custom_tickers)
+                        st.rerun()
 
 
 # python -m streamlit run app.py
