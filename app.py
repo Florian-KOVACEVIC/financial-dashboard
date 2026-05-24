@@ -7,7 +7,8 @@ import pandas as pd
 import numpy as np
 import plotly.graph_objects as go
 from plotly.subplots import make_subplots
-from datetime import date, datetime
+from datetime import date, datetime, timedelta
+import calendar as cal_mod
 
 st.set_page_config(page_title="Tableau de Bord Financier", layout="wide", page_icon="📈")
 
@@ -147,6 +148,7 @@ def filtrer_evenements_proches(events, seuil_jours=_SEUIL_JOURS):
 #  PERSISTANCE TICKERS CUSTOM (JSON local)
 # ════════════════════════════════════════════════════════════
 TICKERS_JSON = "custom_tickers.json"
+ALERTES_JSON = "alertes.json"
 
 def charger_tickers_json() -> list:
     try:
@@ -165,12 +167,30 @@ def sauvegarder_tickers_json(tickers: list):
     except Exception:
         pass
 
+def charger_alertes_json() -> dict:
+    try:
+        if os.path.exists(ALERTES_JSON):
+            with open(ALERTES_JSON, "r", encoding="utf-8") as f:
+                data = json.load(f)
+                if isinstance(data, dict):
+                    return data
+    except Exception:
+        pass
+    return {}
+
+def sauvegarder_alertes_json(alertes: dict):
+    try:
+        with open(ALERTES_JSON, "w", encoding="utf-8") as f:
+            json.dump(alertes, f, indent=2)
+    except Exception:
+        pass
+
 if "custom_tickers"   not in st.session_state:
     st.session_state.custom_tickers = charger_tickers_json()
 if "custom_input_val" not in st.session_state:
     st.session_state.custom_input_val = ""
 if "alertes" not in st.session_state:
-    st.session_state.alertes = {}
+    st.session_state.alertes = charger_alertes_json()
 if "activated_tickers" not in st.session_state:
     st.session_state.activated_tickers = set()
 if "deactivated_tickers" not in st.session_state:
@@ -181,27 +201,21 @@ if "deactivated_tickers" not in st.session_state:
 #  FONCTIONS DATA
 # ════════════════════════════════════════════════════════════
 @st.cache_data(ttl=3600, show_spinner=False)
-def get_data(tickers: tuple, debut: str, fin: str) -> pd.DataFrame:
-    if not tickers: return pd.DataFrame()
+def get_data_and_volume(tickers: tuple, debut: str, fin: str) -> tuple:
+    """Télécharge close + volume en un seul appel yfinance. Retourne (df_close, df_volume)."""
+    if not tickers:
+        return pd.DataFrame(), pd.DataFrame()
     try:
         raw = yf.download(list(tickers), start=debut, end=fin,
                           auto_adjust=True, progress=False, group_by="ticker", threads=True)
-        close = raw.xs("Close", axis=1, level=1) if isinstance(raw.columns, pd.MultiIndex) \
-                else raw[["Close"]].rename(columns={"Close": tickers[0]})
-        return close.dropna(how="all")
-    except Exception as e:
-        st.error(f"Erreur : {e}"); return pd.DataFrame()
-
-@st.cache_data(ttl=3600, show_spinner=False)
-def get_volume(tickers: tuple, debut: str, fin: str) -> pd.DataFrame:
-    if not tickers: return pd.DataFrame()
-    try:
-        raw = yf.download(list(tickers), start=debut, end=fin,
-                          auto_adjust=True, progress=False, group_by="ticker", threads=True)
-        return (raw.xs("Volume", axis=1, level=1) if isinstance(raw.columns, pd.MultiIndex)
-                else raw[["Volume"]].rename(columns={"Volume": tickers[0]})).dropna(how="all")
+        multi = isinstance(raw.columns, pd.MultiIndex)
+        close = (raw.xs("Close", axis=1, level=1) if multi
+                 else raw[["Close"]].rename(columns={"Close": tickers[0]}))
+        volume = (raw.xs("Volume", axis=1, level=1) if multi
+                  else raw[["Volume"]].rename(columns={"Volume": tickers[0]}))
+        return close.dropna(how="all"), volume.dropna(how="all")
     except Exception:
-        return pd.DataFrame()
+        return pd.DataFrame(), pd.DataFrame()
 
 @st.cache_data(ttl=3600, show_spinner=False)
 def get_fiche(ticker: str) -> dict:
@@ -356,8 +370,195 @@ def get_macro_quote(ticker: str) -> dict:
         var_pct = ((prix - prev) / prev * 100) if prix and prev else None
         var_52  = ((prix - float(hist.iloc[0])) / float(hist.iloc[0]) * 100) if prix and not hist.empty else None
         return {"prix": prix, "var_pct": var_pct, "var_52": var_52, "hist": hist}
-    except:
+    except Exception:
         return {"prix": None, "var_pct": None, "var_52": None, "hist": pd.Series(dtype=float)}
+
+# ════════════════════════════════════════════════════════════
+#  CALENDRIER ÉCONOMIQUE — GÉNÉRATION DYNAMIQUE
+# ════════════════════════════════════════════════════════════
+
+# Dates FOMC publiées par la Fed (à mettre à jour 1×/an depuis federalreserve.gov/monetarypolicy/fomccalendars.htm)
+_FOMC_DATES = {
+    2025: ["01-29", "03-19", "05-07", "06-18", "07-30", "09-17", "10-29", "12-17"],
+    2026: ["01-28", "03-18", "05-06", "06-17", "07-29", "09-16", "10-28", "12-16"],
+}
+
+# Dates BCE publiées par la BCE (à mettre à jour 1×/an depuis ecb.europa.eu)
+_BCE_DATES = {
+    2025: ["01-30", "03-06", "04-17", "06-05", "07-17", "09-11", "10-30", "12-18"],
+    2026: ["01-22", "03-05", "04-16", "06-10", "07-16", "09-10", "10-29", "12-17"],
+}
+
+def _nieme_jour_semaine(annee, mois, jour_semaine, n):
+    """Retourne la date du n-ième jour_semaine (0=lundi, 4=vendredi) du mois."""
+    premier = date(annee, mois, 1)
+    decalage = (jour_semaine - premier.weekday()) % 7
+    d = premier + timedelta(days=decalage + 7 * (n - 1))
+    return d if d.month == mois else None
+
+def _dernier_jour_semaine(annee, mois, jour_semaine):
+    """Retourne la date du dernier jour_semaine du mois."""
+    dernier_jour = cal_mod.monthrange(annee, mois)[1]
+    d = date(annee, mois, dernier_jour)
+    while d.weekday() != jour_semaine:
+        d -= timedelta(days=1)
+    return d
+
+def generer_calendrier_macro(horizon_mois=6):
+    """Génère automatiquement le calendrier économique pour les prochains mois."""
+    today = date.today()
+    debut = today - timedelta(days=30)
+    fin = today + timedelta(days=horizon_mois * 31)
+    events = []
+
+    # ── FOMC ──────────────────────────────────────────────────
+    for annee in range(debut.year, fin.year + 1):
+        for md in _FOMC_DATES.get(annee, []):
+            d = date.fromisoformat(f"{annee}-{md}")
+            if debut <= d <= fin:
+                events.append({
+                    "date": d.isoformat(), "heure": "19h00", "zone": "🇺🇸",
+                    "evenement": "Réunion FOMC (Fed)",
+                    "categorie": "Banque centrale", "impact": "🔴 Élevé",
+                    "description": "Décision sur les taux directeurs américains. Conférence de presse du président de la Fed.",
+                    "historique": "En moyenne ±1,2 % sur le S&P 500 le jour J. Volatilité accrue sur USD, obligations et actions tech.",
+                    "actifs_cles": ["^GSPC", "^IXIC", "GLD"],
+                })
+
+    # ── BCE ───────────────────────────────────────────────────
+    for annee in range(debut.year, fin.year + 1):
+        for md in _BCE_DATES.get(annee, []):
+            d = date.fromisoformat(f"{annee}-{md}")
+            if debut <= d <= fin:
+                events.append({
+                    "date": d.isoformat(), "heure": "14h15", "zone": "🇪🇺",
+                    "evenement": "Réunion BCE",
+                    "categorie": "Banque centrale", "impact": "🔴 Élevé",
+                    "description": "Décision de taux de la Banque Centrale Européenne.",
+                    "historique": "Impact moyen ±0,8 % sur l'Euro Stoxx 50. Forte réaction sur EUR/USD.",
+                    "actifs_cles": ["^FCHI", "EURUSD=X"],
+                })
+
+    # ── NFP — 1er vendredi de chaque mois ─────────────────────
+    for annee in range(debut.year, fin.year + 1):
+        for mois in range(1, 13):
+            d = _nieme_jour_semaine(annee, mois, 4, 1)  # 4 = vendredi
+            if d and debut <= d <= fin:
+                mois_ref = (mois - 2) % 12 + 1
+                events.append({
+                    "date": d.isoformat(), "heure": "14h30", "zone": "🇺🇸",
+                    "evenement": f"NFP (Non-Farm Payrolls) — {cal_mod.month_abbr[mois_ref]}",
+                    "categorie": "Emploi", "impact": "🔴 Élevé",
+                    "description": "Rapport mensuel sur l'emploi US. Créations de postes, taux de chômage, salaires horaires.",
+                    "historique": "2ème publication la plus impactante après la Fed. Surprise >50k → USD fort.",
+                    "actifs_cles": ["^GSPC", "EURUSD=X", "GLD"],
+                })
+
+    # ── CPI — ~2ème mercredi de chaque mois ───────────────────
+    for annee in range(debut.year, fin.year + 1):
+        for mois in range(1, 13):
+            d = _nieme_jour_semaine(annee, mois, 2, 2)  # 2 = mercredi, 2ème
+            if d and debut <= d <= fin:
+                mois_ref = (mois - 2) % 12 + 1
+                events.append({
+                    "date": d.isoformat(), "heure": "14h30", "zone": "🇺🇸",
+                    "evenement": f"CPI USA ({cal_mod.month_abbr[mois_ref]})",
+                    "categorie": "Inflation", "impact": "🔴 Élevé",
+                    "description": "Indice des prix à la consommation américain. Indicateur clé pour la trajectoire des taux Fed.",
+                    "historique": "Surprises à la hausse → chute du Nasdaq (-1,5 % moy.). Surprises à la baisse → rally obligataire.",
+                    "actifs_cles": ["^GSPC", "^IXIC", "GLD", "BTC-USD"],
+                })
+
+    # ── PPI — lendemain du CPI (jeudi) ────────────────────────
+    for annee in range(debut.year, fin.year + 1):
+        for mois in range(1, 13):
+            d_cpi = _nieme_jour_semaine(annee, mois, 2, 2)
+            if d_cpi:
+                d = d_cpi + timedelta(days=1)  # jeudi
+                if debut <= d <= fin:
+                    mois_ref = (mois - 2) % 12 + 1
+                    events.append({
+                        "date": d.isoformat(), "heure": "14h30", "zone": "🇺🇸",
+                        "evenement": f"PPI USA ({cal_mod.month_abbr[mois_ref]})",
+                        "categorie": "Inflation", "impact": "🟠 Moyen",
+                        "description": "Prix à la production américains. Indicateur avancé des pressions inflationnistes.",
+                        "historique": "Impact modéré, surtout utilisé pour affiner les prévisions CPI du mois suivant.",
+                        "actifs_cles": ["^GSPC", "GLD"],
+                    })
+
+    # ── PCE Core — dernier vendredi du mois ───────────────────
+    for annee in range(debut.year, fin.year + 1):
+        for mois in range(1, 13):
+            d = _dernier_jour_semaine(annee, mois, 4)  # 4 = vendredi
+            if debut <= d <= fin:
+                mois_ref = (mois - 2) % 12 + 1
+                events.append({
+                    "date": d.isoformat(), "heure": "14h30", "zone": "🇺🇸",
+                    "evenement": f"PCE Core ({cal_mod.month_abbr[mois_ref]})",
+                    "categorie": "Inflation", "impact": "🔴 Élevé",
+                    "description": "Indicateur d'inflation privilégié par la Fed (Personal Consumption Expenditures).",
+                    "historique": "Très suivi par les marchés obligataires. Surprise → réévaluation rapide des anticipations de taux.",
+                    "actifs_cles": ["^GSPC", "GLD", "BTC-USD"],
+                })
+
+    # ── PIB US — dernière semaine des mois de publication ─────
+    for annee in range(debut.year, fin.year + 1):
+        for mois, trimestre, revision in [
+            (1, "T4", "1ère estim."), (2, "T4", "2ème estim."), (3, "T4", "3ème estim."),
+            (4, "T1", "1ère estim."), (5, "T1", "2ème estim."), (6, "T1", "3ème estim."),
+            (7, "T2", "1ère estim."), (8, "T2", "2ème estim."), (9, "T2", "3ème estim."),
+            (10, "T3", "1ère estim."), (11, "T3", "2ème estim."), (12, "T3", "3ème estim."),
+        ]:
+            d = _dernier_jour_semaine(annee, mois, 3)  # dernier jeudi
+            if debut <= d <= fin:
+                impact = "🔴 Élevé" if "1ère" in revision else "🟠 Moyen"
+                events.append({
+                    "date": d.isoformat(), "heure": "14h30", "zone": "🇺🇸",
+                    "evenement": f"PIB USA {trimestre} {annee if '1ère' in revision else annee} ({revision})",
+                    "categorie": "Croissance", "impact": impact,
+                    "description": f"{revision} du PIB américain du {trimestre}.",
+                    "historique": "Surprise négative → forte réaction obligataire et baisse USD.",
+                    "actifs_cles": ["^GSPC", "^IXIC", "GLD"],
+                })
+
+    events.sort(key=lambda x: x["date"])
+    return events
+
+
+@st.cache_data(ttl=86400, show_spinner=False)
+def get_earnings_calendar(tickers: tuple) -> list:
+    """Récupère les prochaines dates de résultats via yfinance pour les tickers donnés."""
+    events = []
+    for tk_str in tickers:
+        try:
+            tk = yf.Ticker(tk_str)
+            cal = tk.calendar
+            earnings_dt = None
+            if isinstance(cal, dict):
+                e = cal.get("Earnings Date") or cal.get("earningsDate")
+                if e:
+                    earnings_dt = pd.to_datetime(e[0] if isinstance(e, list) else e).date()
+            elif isinstance(cal, pd.DataFrame) and not cal.empty:
+                if "Earnings Date" in cal.index:
+                    earnings_dt = pd.to_datetime(cal.loc["Earnings Date"].iloc[0]).date()
+            if earnings_dt and earnings_dt >= date.today() - timedelta(days=30):
+                nom = tk.info.get("longName") or tk.info.get("shortName") or tk_str
+                events.append({
+                    "date": earnings_dt.isoformat(),
+                    "heure": "Après clôture",
+                    "zone": "🇺🇸",
+                    "evenement": f"Résultats {nom} ({tk_str})",
+                    "categorie": "Résultats",
+                    "impact": "🔴 Élevé",
+                    "description": f"Publication des résultats trimestriels de {nom}.",
+                    "historique": f"Forte volatilité attendue sur {tk_str} en after-hours.",
+                    "actifs_cles": [tk_str, "^IXIC"],
+                })
+        except Exception:
+            pass
+    events.sort(key=lambda x: x["date"])
+    return events
+
 
 # Catalogue complet des instruments macro
 MACRO_CATALOGUE = {
@@ -877,8 +1078,9 @@ debut_str = date_debut.strftime("%Y-%m-%d")
 fin_str   = date_fin.strftime("%Y-%m-%d")
 if selection:
     with st.spinner("⏳ Chargement..."):
-        df     = get_data(tuple(sorted(selection)), debut_str, fin_str)
-        df_vol = get_volume(tuple(sorted(selection)), debut_str, fin_str) if show_volume else pd.DataFrame()
+        df, df_vol = get_data_and_volume(tuple(sorted(selection)), debut_str, fin_str)
+        if not show_volume:
+            df_vol = pd.DataFrame()
 else:
     df = df_vol = pd.DataFrame()
 evenements_affiches = filtrer_evenements_proches([
@@ -1299,7 +1501,6 @@ with onglet_pf:
                 c1, c2 = st.columns(2)
                 with c1:
                     st.markdown("**📅 DCA mensuel**")
-                    couleur_dca = "#2d9e5f" if gain_dca >= 0 else "#e05252"
                     st.markdown(f"Valeur finale : **{valeur_finale:,.0f} €**")
                     st.markdown(f"Gain : **:{('green' if gain_dca >= 0 else 'red')}[{gain_dca:+,.0f} €  ({perf_dca:+.1f}%)]**")
                 with c2:
@@ -1459,7 +1660,7 @@ with onglet_pf:
 
                 with st.spinner("⏳ Chargement des données…"):
                     try:
-                        df_raw = get_data(tuple(sorted(tous_tickers)), debut_s, fin_s)
+                        df_raw, _ = get_data_and_volume(tuple(sorted(tous_tickers)), debut_s, fin_s)
                     except Exception as e:
                         st.error(f"Erreur de chargement : {e}")
                         df_raw = pd.DataFrame()
@@ -1685,8 +1886,8 @@ with onglet2:
             fin_b   = st.date_input("Fin B",   value=datetime(2022,1,1), key="fb")
         if st.button("🔄 Comparer"):
             with st.spinner("Chargement..."):
-                df_a = get_data(tuple(sorted(selection)), debut_a.strftime("%Y-%m-%d"), fin_a.strftime("%Y-%m-%d"))
-                df_b = get_data(tuple(sorted(selection)), debut_b.strftime("%Y-%m-%d"), fin_b.strftime("%Y-%m-%d"))
+                df_a, _ = get_data_and_volume(tuple(sorted(selection)), debut_a.strftime("%Y-%m-%d"), fin_a.strftime("%Y-%m-%d"))
+                df_b, _ = get_data_and_volume(tuple(sorted(selection)), debut_b.strftime("%Y-%m-%d"), fin_b.strftime("%Y-%m-%d"))
             if df_a.empty or df_b.empty:
                 st.error("Données insuffisantes.")
             else:
@@ -2473,6 +2674,7 @@ with onglet6:
                 # ── Calcul DCF ────────────────────────────────────
                 valeur_intrinsec = None
                 flux_base        = None
+                flux_annuels     = []
                 label_flux       = ""
 
                 if methode == "DCF — Free Cash Flow":
@@ -2607,7 +2809,7 @@ with onglet6:
                         st.plotly_chart(fig_gauge, width="stretch")
 
                     # ── Tableau flux projetés ──────────────────────
-                    if methode != "Valeur de Graham" and 'flux_annuels' in dir():
+                    if methode != "Valeur de Graham" and flux_annuels:
                         with st.expander("📋 Détail des flux projetés"):
                             df_flux = pd.DataFrame(flux_annuels)
                             df_flux["Flux projeté"] = df_flux["Flux projeté"].map(lambda x: f"{x:.2f}")
@@ -2711,7 +2913,6 @@ with onglet_macro:
 
         # Chargement de tous les instruments en parallèle (cache)
         donnees = {}
-        cols_load = st.columns(len(instruments))
         with st.spinner(f"Chargement {cat}…"):
             for inst in instruments:
                 donnees[inst["ticker"]] = get_macro_quote(inst["ticker"])
@@ -2780,11 +2981,6 @@ with onglet_macro:
             "Quand les taux courts dépassent les taux longs (courbe inversée), "
             "c'est historiquement un signal précurseur de récession (avec 12–18 mois de délai)."
         )
-        taux_tickers = {
-            "3 mois": "^IRX", "2 ans": "^FVX", "5 ans": "^FVX",
-            "10 ans": "^TNX", "30 ans": "^TYX"
-        }
-        # On prend les taux disponibles
         taux_reels = {
             "3 mois": "^IRX",
             "10 ans": "^TNX",
@@ -2907,7 +3103,7 @@ with onglet_news:
                                 meta_parts.append(f"🕐 il y a {h}h" if h else "🕐 à l'instant")
                             else:
                                 meta_parts.append(f"📅 {art['date'].strftime('%d %b %Y')}")
-                        except:
+                        except Exception:
                             pass
                     if meta_parts:
                         st.caption("  ·  ".join(meta_parts))
@@ -2945,7 +3141,10 @@ with onglet_alertes:
                 for tk_a in tous_tickers_alertes:
                     cfg = st.session_state.alertes[tk_a]
                     try:
-                        prix_actuel = yf.Ticker(tk_a).fast_info.get("lastPrice") or yf.Ticker(tk_a).info.get("regularMarketPrice")
+                        fi = yf.Ticker(tk_a).fast_info
+                        prix_actuel = fi.get("lastPrice") if fi else None
+                        if prix_actuel is None:
+                            prix_actuel = yf.Ticker(tk_a).info.get("regularMarketPrice")
                         if prix_actuel is None:
                             continue
                         seuil_haut = cfg.get("above")
@@ -2964,8 +3163,8 @@ with onglet_alertes:
                                 "msg": f"📉 **{tk_a}** a franchi le seuil BAS : {prix_actuel:.2f} ≤ {seuil_bas:.2f}",
                                 "color": "#e05252",
                             })
-                    except:
-                        pass
+                    except Exception:
+                        st.warning(f"⚠️ Impossible de vérifier le prix de {tk_a}.")
 
         # ── Affichage des alertes déclenchées ──────────────────
         if alertes_declenchees:
@@ -3046,16 +3245,19 @@ with onglet_alertes:
                         nouvelle_cfg["below"] = seuil_below
                     if nouvelle_cfg:
                         st.session_state.alertes[ticker_alerte] = nouvelle_cfg
+                        sauvegarder_alertes_json(st.session_state.alertes)
                         st.success(f"✅ Alertes enregistrées pour {ticker_alerte} !")
                     else:
                         if ticker_alerte in st.session_state.alertes:
                             del st.session_state.alertes[ticker_alerte]
+                            sauvegarder_alertes_json(st.session_state.alertes)
                         st.info(f"Aucun seuil actif pour {ticker_alerte}.")
 
             with col_del:
                 if ticker_alerte in st.session_state.alertes:
                     if st.button("🗑️ Supprimer", key="btn_del_alerte"):
                         del st.session_state.alertes[ticker_alerte]
+                        sauvegarder_alertes_json(st.session_state.alertes)
                         st.rerun()
 
             st.divider()
@@ -3075,8 +3277,7 @@ with onglet_alertes:
                 })
             st.dataframe(pd.DataFrame(lignes_al).set_index("Ticker"), width="stretch")
             st.caption(
-                "⚠️ Les alertes sont stockées en mémoire (session Streamlit). "
-                "Elles sont réinitialisées si l'application est redémarrée. "
+                "💾 Les alertes sont sauvegardées localement (alertes.json) et persistent entre les sessions. "
                 "Recharge la page pour re-vérifier les prix."
             )
         else:
@@ -3088,163 +3289,24 @@ with onglet_alertes:
 # ════════════════════════════════════════════════════════════
 with onglet_cal:
     st.title("Calendrier Économique")
-    st.caption("Prochains événements macro majeurs : banques centrales, inflation, emploi, résultats d'entreprises.")
+    st.caption("Événements macro générés automatiquement (FOMC, BCE, CPI, NFP, PCE, PPI, PIB) + résultats d'entreprises via Yahoo Finance.")
 
-    # ── Données statiques enrichies ───────────────────────────
-    # Impact : 🔴 Élevé  🟠 Moyen  🟡 Faible
-    # Catégories filtrables
-    CALENDRIER = [
-        # ── Banques centrales ─────────────────────────────────
-        {"date": "2026-03-18", "heure": "19h00", "zone": "🇺🇸", "evenement": "Réunion FOMC (Fed)",
-         "categorie": "Banque centrale", "impact": "🔴 Élevé",
-         "description": "Décision sur les taux directeurs américains. Marché surveille le dot plot et la conférence de presse de Powell.",
-         "historique": "En moyenne ±1,2% sur le S&P 500 le jour J. Volatilité accrue sur USD, obligations et actions tech.",
-         "actifs_cles": ["^GSPC", "^IXIC", "GLD"]},
-
-        {"date": "2026-04-16", "heure": "14h15", "zone": "🇪🇺", "evenement": "Réunion BCE",
-         "categorie": "Banque centrale", "impact": "🔴 Élevé",
-         "description": "Décision de taux de la Banque Centrale Européenne. Suivi des projections d'inflation et déclarations de Lagarde.",
-         "historique": "Impact moyen ±0,8% sur l'Euro Stoxx 50. Forte réaction sur EUR/USD.",
-         "actifs_cles": ["^FCHI", "EURUSD=X"]},
-
-        {"date": "2026-05-06", "heure": "19h00", "zone": "🇺🇸", "evenement": "Réunion FOMC (Fed)",
-         "categorie": "Banque centrale", "impact": "🔴 Élevé",
-         "description": "2ème réunion Fed du semestre. Bilan de la trajectoire d'inflation et du marché du travail.",
-         "historique": "En moyenne ±1,2% sur le S&P 500 le jour J.",
-         "actifs_cles": ["^GSPC", "^IXIC", "GLD"]},
-
-        {"date": "2026-06-10", "heure": "14h15", "zone": "🇪🇺", "evenement": "Réunion BCE",
-         "categorie": "Banque centrale", "impact": "🔴 Élevé",
-         "description": "Réunion BCE de juin, avec nouvelles projections macroéconomiques du staff.",
-         "historique": "Impact moyen ±0,8% sur l'Euro Stoxx 50.",
-         "actifs_cles": ["^FCHI", "EURUSD=X"]},
-
-        {"date": "2026-06-17", "heure": "19h00", "zone": "🇺🇸", "evenement": "Réunion FOMC (Fed)",
-         "categorie": "Banque centrale", "impact": "🔴 Élevé",
-         "description": "Réunion Fed de juin avec nouveau dot plot. Réunion pivot potentielle sur la trajectoire des taux.",
-         "historique": "Les réunions avec dot plot génèrent en moyenne 30% de volatilité supplémentaire.",
-         "actifs_cles": ["^GSPC", "^IXIC", "GLD"]},
-
-        # ── Inflation ─────────────────────────────────────────
-        {"date": "2026-03-11", "heure": "14h30", "zone": "🇺🇸", "evenement": "CPI USA (févr. 2026)",
-         "categorie": "Inflation", "impact": "🔴 Élevé",
-         "description": "Indice des prix à la consommation américain pour février 2026. Indicateur clé pour la trajectoire des taux Fed.",
-         "historique": "Surprises à la hausse → chute du Nasdaq (-1,5% moy.). Surprises à la baisse → rally obligataire.",
-         "actifs_cles": ["^GSPC", "^IXIC", "GLD", "BTC-USD"]},
-
-        {"date": "2026-04-10", "heure": "14h30", "zone": "🇺🇸", "evenement": "CPI USA (mars 2026)",
-         "categorie": "Inflation", "impact": "🔴 Élevé",
-         "description": "Publication mensuelle de l'inflation US pour mars 2026.",
-         "historique": "Volatilité intraday moyenne ±0,9% sur le S&P 500.",
-         "actifs_cles": ["^GSPC", "^IXIC", "GLD"]},
-
-        {"date": "2026-05-13", "heure": "14h30", "zone": "🇺🇸", "evenement": "CPI USA (avril 2026)",
-         "categorie": "Inflation", "impact": "🔴 Élevé",
-         "description": "CPI US d'avril 2026. Baromètre de la persistance inflationniste en milieu d'année.",
-         "historique": "Surprises à la hausse → réévaluation immédiate des anticipations de baisse de taux.",
-         "actifs_cles": ["^GSPC", "^IXIC", "GLD", "BTC-USD"]},
-
-        {"date": "2026-03-18", "heure": "11h00", "zone": "🇪🇺", "evenement": "CPI Zone Euro (févr. 2026) final",
-         "categorie": "Inflation", "impact": "🟠 Moyen",
-         "description": "Confirmation de l'inflation européenne pour février 2026. Influence les anticipations BCE.",
-         "historique": "Impact limité si conforme à l'estimation flash. Surprise → ±0,5% sur EUR/USD.",
-         "actifs_cles": ["^FCHI", "EURUSD=X"]},
-
-        {"date": "2026-03-27", "heure": "14h30", "zone": "🇺🇸", "evenement": "PCE Core (févr. 2026)",
-         "categorie": "Inflation", "impact": "🔴 Élevé",
-         "description": "Indicateur d'inflation privilégié par la Fed (Personal Consumption Expenditures).",
-         "historique": "Très suivi par les marchés obligataires. Surprise → réévaluation rapide des anticipations de taux.",
-         "actifs_cles": ["^GSPC", "GLD", "BTC-USD"]},
-
-        {"date": "2026-04-30", "heure": "14h30", "zone": "🇺🇸", "evenement": "PCE Core (mars 2026)",
-         "categorie": "Inflation", "impact": "🔴 Élevé",
-         "description": "PCE Core de mars 2026. Publié le même jour que le PIB T1, double impact potentiel.",
-         "historique": "Combinaison PIB+PCE : journée à forte volatilité historique.",
-         "actifs_cles": ["^GSPC", "GLD"]},
-
-        {"date": "2026-03-13", "heure": "14h30", "zone": "🇺🇸", "evenement": "PPI USA (févr. 2026)",
-         "categorie": "Inflation", "impact": "🟠 Moyen",
-         "description": "Prix à la production américains. Indicateur avancé des pressions inflationnistes.",
-         "historique": "Impact modéré, surtout utilisé pour affiner les prévisions CPI du mois suivant.",
-         "actifs_cles": ["^GSPC", "GLD"]},
-
-        # ── Emploi ────────────────────────────────────────────
-        {"date": "2026-03-06", "heure": "14h30", "zone": "🇺🇸", "evenement": "NFP (Non-Farm Payrolls) — févr.",
-         "categorie": "Emploi", "impact": "🔴 Élevé",
-         "description": "Rapport mensuel sur l'emploi US. Créations de postes + taux de chômage + salaires horaires.",
-         "historique": "2ème publication la plus impactante après la Fed. Surprise >50k → USD fort.",
-         "actifs_cles": ["^GSPC", "EURUSD=X", "GLD"]},
-
-        {"date": "2026-04-03", "heure": "14h30", "zone": "🇺🇸", "evenement": "NFP (Non-Farm Payrolls) — mars",
-         "categorie": "Emploi", "impact": "🔴 Élevé",
-         "description": "NFP de mars 2026. Baromètre de la santé du marché du travail au T1 2026.",
-         "historique": "Volatilité moyenne ±0,7% sur l'indice USD le jour J.",
-         "actifs_cles": ["^GSPC", "EURUSD=X"]},
-
-        {"date": "2026-05-08", "heure": "14h30", "zone": "🇺🇸", "evenement": "NFP (Non-Farm Payrolls) — avril",
-         "categorie": "Emploi", "impact": "🔴 Élevé",
-         "description": "NFP d'avril 2026. Contexte post-FOMC de mai, double impact potentiel sur la semaine.",
-         "historique": "Réaction amplifiée quand la Fed vient de se réunir dans les jours précédents.",
-         "actifs_cles": ["^GSPC", "EURUSD=X", "GLD"]},
-
-        # ── Croissance ────────────────────────────────────────
-        {"date": "2026-03-26", "heure": "14h30", "zone": "🇺🇸", "evenement": "PIB USA T4 2025 (3ème estim.)",
-         "categorie": "Croissance", "impact": "🟠 Moyen",
-         "description": "3ème et dernière révision du PIB américain du T4 2025.",
-         "historique": "Révision finale : impact modéré sauf écart significatif vs 2ème estimation.",
-         "actifs_cles": ["^GSPC", "EURUSD=X"]},
-
-        {"date": "2026-04-29", "heure": "14h30", "zone": "🇺🇸", "evenement": "PIB USA T1 2026 (1ère estim.)",
-         "categorie": "Croissance", "impact": "🔴 Élevé",
-         "description": "Première estimation de la croissance US au T1 2026. Indicateur clé pour calibrer la Fed.",
-         "historique": "Surprise négative → forte réaction obligataire et baisse USD.",
-         "actifs_cles": ["^GSPC", "^IXIC", "GLD"]},
-
-        # ── Résultats T1 2026 (saison avril-mai) ──────────────
-        {"date": "2026-04-22", "heure": "Après clôture", "zone": "🇺🇸", "evenement": "Résultats Alphabet (GOOGL) T1 2026",
-         "categorie": "Résultats", "impact": "🔴 Élevé",
-         "description": "Résultats trimestriels Google T1 2026. Focus revenus pub Search/YouTube et croissance cloud GCP.",
-         "historique": "Réaction moyenne ±5% en after-hours. Contagion sur Meta et le secteur ad-tech.",
-         "actifs_cles": ["GOOGL", "META", "^IXIC"]},
-
-        {"date": "2026-04-23", "heure": "Après clôture", "zone": "🇺🇸", "evenement": "Résultats Meta (META) T1 2026",
-         "categorie": "Résultats", "impact": "🔴 Élevé",
-         "description": "Résultats Meta T1 2026. Revenus publicitaires, croissance des DAU et investissements IA.",
-         "historique": "Forte volatilité ±6% moy. en after-hours.",
-         "actifs_cles": ["META", "GOOGL", "^IXIC"]},
-
-        {"date": "2026-04-28", "heure": "Avant ouverture", "zone": "🇺🇸", "evenement": "Résultats Microsoft (MSFT) T3 2026",
-         "categorie": "Résultats", "impact": "🔴 Élevé",
-         "description": "Azure, Copilot, gaming. Baromètre de l'adoption IA en entreprise pour le T3 fiscal.",
-         "historique": "±4,5% moy. en after-hours. Corrélation forte avec NVDA.",
-         "actifs_cles": ["MSFT", "NVDA", "^IXIC"]},
-
-        {"date": "2026-04-29", "heure": "Après clôture", "zone": "🇺🇸", "evenement": "Résultats Apple (AAPL) T2 2026",
-         "categorie": "Résultats", "impact": "🔴 Élevé",
-         "description": "Résultats Apple T2 fiscal 2026. iPhone, Services, Vision Pro et guidance Q3.",
-         "historique": "±4% moy. Apple pèse ~7% du S&P 500, fort impact indiciel.",
-         "actifs_cles": ["AAPL", "^GSPC", "^IXIC"]},
-
-        {"date": "2026-04-21", "heure": "Après clôture", "zone": "🇺🇸", "evenement": "Résultats Tesla (TSLA) T1 2026",
-         "categorie": "Résultats", "impact": "🔴 Élevé",
-         "description": "Livraisons, marges et guidance. Contexte de forte concurrence et pression sur les prix.",
-         "historique": "Titre le plus volatil des Mag7 : ±8% moy. en after-hours.",
-         "actifs_cles": ["TSLA", "^IXIC"]},
-
-        {"date": "2026-05-01", "heure": "Après clôture", "zone": "🇺🇸", "evenement": "Résultats Amazon (AMZN) T1 2026",
-         "categorie": "Résultats", "impact": "🔴 Élevé",
-         "description": "AWS, e-commerce, publicité digitale. Focus sur la rentabilité d'AWS et guidance T2.",
-         "historique": "±5% moy. Impact sur le secteur cloud (MSFT, GOOGL) et e-commerce.",
-         "actifs_cles": ["AMZN", "^GSPC", "^IXIC"]},
-
-        {"date": "2026-05-28", "heure": "Après clôture", "zone": "🇺🇸", "evenement": "Résultats Nvidia (NVDA) T1 2026",
-         "categorie": "Résultats", "impact": "🔴 Élevé",
-         "description": "Résultats NVDA : datacenter IA, GPU H100/H200/B100. Publication la plus attendue du secteur tech.",
-         "historique": "Réaction moyenne ±8% en after-hours. Effet contagion sur tout le secteur IA/semi.",
-         "actifs_cles": ["NVDA", "MSFT", "^IXIC"]},
-    ]
-
-    # Trier par date
+    # ── Génération dynamique du calendrier ──────────────────────
+    CALENDRIER = generer_calendrier_macro(horizon_mois=6)
+    # Ajouter les dates de résultats des tickers sélectionnés + tickers prédéfinis
+    _tickers_earnings = tuple(sorted(set(
+        list(TICKERS_APP.get("Actions", [])) + list(selection if selection else [])
+    )))
+    CALENDRIER += get_earnings_calendar(_tickers_earnings)
+    # Dédupliquer par (date, evenement)
+    _seen = set()
+    _cal_dedup = []
+    for e in CALENDRIER:
+        key = (e["date"], e["evenement"])
+        if key not in _seen:
+            _seen.add(key)
+            _cal_dedup.append(e)
+    CALENDRIER = _cal_dedup
     CALENDRIER.sort(key=lambda x: x["date"])
 
     # ── Filtres ───────────────────────────────────────────────
@@ -3432,7 +3494,7 @@ with onglet_heat:
 
     with st.spinner("⏳ Chargement des données sectorielles…"):
         try:
-            df_heat = get_data(tuple(sorted(tickers_heat)), debut_h, fin_h)
+            df_heat, _ = get_data_and_volume(tuple(sorted(tickers_heat)), debut_h, fin_h)
         except Exception:
             df_heat = pd.DataFrame()
 
@@ -3595,7 +3657,7 @@ with onglet_heat:
 
                 with st.spinner("Chargement des actions individuelles…"):
                     try:
-                        df_sous = get_data(tuple(sorted(tous_sous)), debut_h, fin_h)
+                        df_sous, _ = get_data_and_volume(tuple(sorted(tous_sous)), debut_h, fin_h)
                     except Exception:
                         df_sous = pd.DataFrame()
 
