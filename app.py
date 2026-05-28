@@ -1,5 +1,4 @@
 # Application tableau de bord financier
-import os
 import json
 import streamlit as st
 import yfinance as yf
