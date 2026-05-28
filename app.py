@@ -3859,7 +3859,3 @@ with onglet7:
                                 st.session_state.custom_tickers.append(tk)
                                 sauvegarder_tickers_json(st.session_state.custom_tickers)
                             st.rerun()
-
-
-# python -m streamlit run app.py
-
