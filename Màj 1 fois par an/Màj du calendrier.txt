@@ -1,1 +1,0 @@
-Pour les dates FOMC/BCE, il suffit de mettre a jour les dicts _FOMC_DATES et _BCE_DATES une fois par an quand les calendriers officiels sont publies. Tout le reste (NFP, CPI, PPI, PCE, PIB, earnings) est 100% automatique.
