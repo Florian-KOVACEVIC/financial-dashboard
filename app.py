@@ -63,6 +63,27 @@ def filtrer_evenements_proches(events, seuil_jours=_SEUIL_JOURS):
             last_dt = dt
     return result
 
+    
+# JS détection de l'ouverture/fermeture du volet latéral
+st.html("""
+<script>
+(function() {
+    const obs = new MutationObserver(() => {
+        window.dispatchEvent(new Event('resize'));
+    });
+    const sidebar = document.querySelector('[data-testid="stSidebar"]');
+    if (sidebar) obs.observe(sidebar, { attributes: true, attributeFilter: ['style', 'class'] });
+    // Fallback : observe le body pour détecter l'ajout de la classe collapsed
+    obs.observe(document.body, { attributes: true, subtree: true, attributeFilter: ['style', 'class'] });
+})();
+</script>
+""")
+
+TICKERS_APP = {
+    "Actions":  ["NVDA", "AAPL", "MSFT", "GOOGL", "TSLA", "META", "AMZN"],
+    "Crypto":   ["BTC-USD", "ETH-USD", "SOL-USD"],
+    "Indices":  ["^GSPC", "^IXIC", "^FCHI", "^N225"],
+}
 
 # ════════════════════════════════════════════════════════════
 #  PERSISTANCE TICKERS CUSTOM (JSON local)
@@ -920,7 +941,7 @@ with st.sidebar:
     show_events    = st.toggle("Événements historiques", value=False,
         help="Lignes verticales sur les grands événements financiers.\n\n"
              "Seuls les événements après ta date de début sont affichés.\n\n"
-             "👉 Visualise comment tes actifs ont réagi aux crises passées.")
+             "Visualise comment tes actifs ont réagi aux crises passées.")
     st.divider()
 
     # Construire le set des tickers pré-définis pour référence
@@ -3846,24 +3867,3 @@ hr { border-color: rgba(255,255,255,0.07) !important; margin: 0.6rem 0 !importan
 }
 </style>
 """, unsafe_allow_html=True)
-
-# JS : détecte l'ouverture/fermeture du volet latéral et force un resize Plotly
-st.html("""
-<script>
-(function() {
-    const obs = new MutationObserver(() => {
-        window.dispatchEvent(new Event('resize'));
-    });
-    const sidebar = document.querySelector('[data-testid="stSidebar"]');
-    if (sidebar) obs.observe(sidebar, { attributes: true, attributeFilter: ['style', 'class'] });
-    // Fallback : observe le body pour détecter l'ajout de la classe collapsed
-    obs.observe(document.body, { attributes: true, subtree: true, attributeFilter: ['style', 'class'] });
-})();
-</script>
-""")
-
-TICKERS_APP = {
-    "Actions":  ["NVDA", "AAPL", "MSFT", "GOOGL", "TSLA", "META", "AMZN"],
-    "Crypto":   ["BTC-USD", "ETH-USD", "SOL-USD"],
-    "Indices":  ["^GSPC", "^IXIC", "^FCHI", "^N225"],
-}
