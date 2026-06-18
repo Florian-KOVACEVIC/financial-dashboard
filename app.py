@@ -19,93 +19,6 @@ import calendar as cal_mod
 
 st.set_page_config(page_title="Tableau de Bord Financier", layout="wide", page_icon="📈")
 
-# ── CSS global ────────────────────────────────────────────────
-st.markdown("""
-<style>
-/* ── Layout général ──────────────────────────────────────── */
-.block-container { padding-top: 1rem !important; margin-top: 2rem !important }
-hr { border-color: rgba(255,255,255,0.07) !important; margin: 0.6rem 0 !important; }
-
-/* ── Sidebar ─────────────────────────────────────────────── */
-[data-testid="stSidebar"] { min-width: 300px; max-width: 320px; }
-[data-testid="stSidebar"] .stMarkdown p { font-size: 0.82rem; }
-/* Toggles sur une seule ligne avec icône ⓘ bien alignée */
-[data-testid="stSidebar"] [data-testid="stToggle"] {
-    display: flex !important;
-    align-items: center !important;
-    gap: 6px !important;
-    flex-wrap: nowrap !important;
-}
-[data-testid="stSidebar"] [data-testid="stToggle"] > label {
-    font-size: 0.84rem !important;
-    white-space: nowrap !important;
-    flex: 1 !important;
-}
-
-/* ── Tabs navigation ─────────────────────────────────────── */
-[data-testid="stTabs"] [data-baseweb="tab-list"] {
-    gap: 2px !important;
-    flex-wrap: wrap !important;
-    background: rgba(255,255,255,0.03) !important;
-    border-radius: 10px !important;
-    padding: 4px !important;
-}
-[data-testid="stTabs"] [data-baseweb="tab"] {
-    border-radius: 7px !important;
-    padding: 6px 14px !important;
-    font-size: 0.82rem !important;
-    font-weight: 500 !important;
-    color: rgba(255,255,255,0.55) !important;
-    background: transparent !important;
-    border: none !important;
-    white-space: nowrap !important;
-}
-[data-testid="stTabs"] [data-baseweb="tab"]:hover {
-    background: rgba(255,255,255,0.07) !important;
-    color: rgba(255,255,255,0.9) !important;
-}
-[data-testid="stTabs"] [aria-selected="true"] {
-    background: rgba(0,212,170,0.15) !important;
-    color: #00D4AA !important;
-    font-weight: 700 !important;
-}
-[data-testid="stTabs"] [data-baseweb="tab-highlight"] {
-    display: none !important;
-}
-[data-testid="stTabs"] [data-baseweb="tab-border"] {
-    display: none !important;
-}
-[data-testid="metric-container"] [data-testid="stMetricValue"] {
-    font-size: 1.2rem !important;
-}
-/* Graphiques toujours pleine largeur */
-[data-testid="stPlotlyChart"], [data-testid="stPlotlyChart"] > div {
-    width: 100% !important;
-}
-</style>
-""", unsafe_allow_html=True)
-
-# JS : détecte l'ouverture/fermeture du volet latéral et force un resize Plotly
-st.html("""
-<script>
-(function() {
-    const obs = new MutationObserver(() => {
-        window.dispatchEvent(new Event('resize'));
-    });
-    const sidebar = document.querySelector('[data-testid="stSidebar"]');
-    if (sidebar) obs.observe(sidebar, { attributes: true, attributeFilter: ['style', 'class'] });
-    // Fallback : observe le body pour détecter l'ajout de la classe collapsed
-    obs.observe(document.body, { attributes: true, subtree: true, attributeFilter: ['style', 'class'] });
-})();
-</script>
-""")
-
-TICKERS_APP = {
-    "Actions":  ["NVDA", "AAPL", "MSFT", "GOOGL", "TSLA", "META", "AMZN"],
-    "Crypto":   ["BTC-USD", "ETH-USD", "SOL-USD"],
-    "Indices":  ["^GSPC", "^IXIC", "^FCHI", "^N225"],
-}
-
 DEFAUT = {"AAPL"}
 
 EVENEMENTS = [
@@ -3867,3 +3780,90 @@ with onglet7:
                                 st.session_state.custom_tickers.append(tk)
                                 sauvegarder_tickers_json(st.session_state.custom_tickers)
                             st.rerun()
+                            
+# ── CSS global ────────────────────────────────────────────────
+st.markdown("""
+<style>
+/* ── Layout général ──────────────────────────────────────── */
+.block-container { padding-top: 1rem !important; margin-top: 2rem !important }
+hr { border-color: rgba(255,255,255,0.07) !important; margin: 0.6rem 0 !important; }
+
+/* ── Sidebar ─────────────────────────────────────────────── */
+[data-testid="stSidebar"] { min-width: 300px; max-width: 320px; }
+[data-testid="stSidebar"] .stMarkdown p { font-size: 0.82rem; }
+/* Toggles sur une seule ligne avec icône ⓘ bien alignée */
+[data-testid="stSidebar"] [data-testid="stToggle"] {
+    display: flex !important;
+    align-items: center !important;
+    gap: 6px !important;
+    flex-wrap: nowrap !important;
+}
+[data-testid="stSidebar"] [data-testid="stToggle"] > label {
+    font-size: 0.84rem !important;
+    white-space: nowrap !important;
+    flex: 1 !important;
+}
+
+/* ── Tabs navigation ─────────────────────────────────────── */
+[data-testid="stTabs"] [data-baseweb="tab-list"] {
+    gap: 2px !important;
+    flex-wrap: wrap !important;
+    background: rgba(255,255,255,0.03) !important;
+    border-radius: 10px !important;
+    padding: 4px !important;
+}
+[data-testid="stTabs"] [data-baseweb="tab"] {
+    border-radius: 7px !important;
+    padding: 6px 14px !important;
+    font-size: 0.82rem !important;
+    font-weight: 500 !important;
+    color: rgba(255,255,255,0.55) !important;
+    background: transparent !important;
+    border: none !important;
+    white-space: nowrap !important;
+}
+[data-testid="stTabs"] [data-baseweb="tab"]:hover {
+    background: rgba(255,255,255,0.07) !important;
+    color: rgba(255,255,255,0.9) !important;
+}
+[data-testid="stTabs"] [aria-selected="true"] {
+    background: rgba(0,212,170,0.15) !important;
+    color: #00D4AA !important;
+    font-weight: 700 !important;
+}
+[data-testid="stTabs"] [data-baseweb="tab-highlight"] {
+    display: none !important;
+}
+[data-testid="stTabs"] [data-baseweb="tab-border"] {
+    display: none !important;
+}
+[data-testid="metric-container"] [data-testid="stMetricValue"] {
+    font-size: 1.2rem !important;
+}
+/* Graphiques toujours pleine largeur */
+[data-testid="stPlotlyChart"], [data-testid="stPlotlyChart"] > div {
+    width: 100% !important;
+}
+</style>
+""", unsafe_allow_html=True)
+
+# JS : détecte l'ouverture/fermeture du volet latéral et force un resize Plotly
+st.html("""
+<script>
+(function() {
+    const obs = new MutationObserver(() => {
+        window.dispatchEvent(new Event('resize'));
+    });
+    const sidebar = document.querySelector('[data-testid="stSidebar"]');
+    if (sidebar) obs.observe(sidebar, { attributes: true, attributeFilter: ['style', 'class'] });
+    // Fallback : observe le body pour détecter l'ajout de la classe collapsed
+    obs.observe(document.body, { attributes: true, subtree: true, attributeFilter: ['style', 'class'] });
+})();
+</script>
+""")
+
+TICKERS_APP = {
+    "Actions":  ["NVDA", "AAPL", "MSFT", "GOOGL", "TSLA", "META", "AMZN"],
+    "Crypto":   ["BTC-USD", "ETH-USD", "SOL-USD"],
+    "Indices":  ["^GSPC", "^IXIC", "^FCHI", "^N225"],
+}
