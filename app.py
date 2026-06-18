@@ -19,7 +19,7 @@ import calendar as cal_mod
 
 st.set_page_config(page_title="Tableau de Bord Financier", layout="wide", page_icon="📈")
 
-DEFAUT = {"SPCX"}
+DEFAUT = {"TTWO"}
 
 EVENEMENTS = [
     # ── Années 2000 ──────────────────────────────────────────
