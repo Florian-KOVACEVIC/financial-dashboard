@@ -2,7 +2,7 @@
 
 **[Live Demo](https://financial-dashboard-florian-kovacevic.streamlit.app/)**
 
-Interactive financial dashboard for multi-asset analysis — equities, crypto, ETFs, indices and macro indicators.
+Interactive financial dashboard for multi-asset analysis — equities, cryptos, ETFs, indices and macro indicators.
 
 Built as a personal project to explore quantitative finance concepts through hands-on development.
 
