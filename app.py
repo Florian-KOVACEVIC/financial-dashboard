@@ -5,7 +5,7 @@ Auteur  : FloKov
 Stack   : Streamlit · yfinance · Pandas · NumPy · Plotly
 Usage   : streamlit run app.py
 """
-
+ 
 # Application tableau de bord financier
 import json
 import streamlit as st
