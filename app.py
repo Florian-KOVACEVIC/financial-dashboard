@@ -3,7 +3,7 @@ Financial Dashboard - Application Tableau de Bord Multi-Actifs
 --------------------------------------------------------------
 Auteur  : FloKov
 Stack   : Streamlit · yfinance · Pandas · NumPy · Plotly 
-Usage   : streamlit run app.py
+Usage   : streamlit run app.py 
 """
  
 # Application tableau de bord financier
