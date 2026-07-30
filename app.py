@@ -9,7 +9,7 @@ Usage   : streamlit run app.py
 # Application tableau de bord financier
 import json
 import streamlit as st
-import yfinance as yf
+import yfinance as yf 
 import pandas as pd 
 import numpy as np
 import plotly.graph_objects as go
